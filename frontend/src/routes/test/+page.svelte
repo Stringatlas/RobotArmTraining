@@ -1,13 +1,15 @@
 <script lang="ts">
-	import ControlPanel from '$lib/components/ControlPanel.svelte';
+    import TestPanel from '$lib/components/TestPanel.svelte';
 	import Scene from '$lib/components/Scene.svelte';
 	import WebStream from '$lib/components/CamStream.svelte';
+    import { toolheadPose } from '$lib/state/robotState';
+
 </script>
 
 <div class="page-shell">
 	<div class="main-grid">
 		<div class="left-panel">
-			<ControlPanel />
+			<TestPanel />
 		</div>
 
 		<div class="right-panel">

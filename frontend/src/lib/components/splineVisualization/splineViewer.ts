@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { Spline3D, type Vec3 } from './spline';
-import type { CurrentTrajectory } from '$lib/state/robotState';
+import type { Trajectory } from '$lib/state/robotState';
 
 export interface SplineTrajectoryViewerOptions {
 	backgroundColor?: number;
@@ -23,7 +23,7 @@ export class SplineTrajectoryObjectBuilder {
 		this.options = options;
 	}
 
-	create(trajectory: CurrentTrajectory): THREE.Group {
+	create(trajectory: Trajectory): THREE.Group {
 		const spline = new Spline3D(trajectory.start, trajectory.end, trajectory.controlScaling);
 		const samplePointCount = Math.max(2, Math.floor(trajectory.samplePoints));
 		const linePointCount = Math.max(2, Math.floor(trajectory.lineSamples));

@@ -8,11 +8,11 @@
 		currentTrajectory,
 		initialCurrentTrajectory,
 		initialRobotJointValues,
-		robotState,
+		robotJointValues,
 		setRobotJoint,
-		type CurrentTrajectory,
-		type RobotJointName
+		type Trajectory,
 	} from '$lib/state/robotState';
+    import type { RobotJointName } from '$lib/types';
 	import { clearSplineObject, setSplineObject } from '$lib/state/splineObject';
 
 	interface Props {
@@ -45,7 +45,7 @@
 	let viewer = $state<RobotViewer | undefined>(undefined);
 	let jointValues = $state({ ...initialRobotJointValues });
 	let jointLimits = $state<Partial<Record<RobotJointName, JointRange>>>({});
-	let currentTrajectoryValue = $state<CurrentTrajectory>({ ...initialCurrentTrajectory });
+	let currentTrajectoryValue = $state<Trajectory>({ ...initialCurrentTrajectory });
 	let showTrajectory = $state(true);
     let showJoints = $state(true);
 
@@ -136,7 +136,7 @@
 	}
 
 	$effect(() => {
-		const unsubscribe = robotState.subscribe((values) => {
+		const unsubscribe = robotJointValues.subscribe((values) => {
 			jointValues = values;
 		});
 

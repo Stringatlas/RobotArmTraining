@@ -1,4 +1,5 @@
-import {writable} from 'svelte/store';
+import { writable } from 'svelte/store';
+import type { EulerPose } from '$lib/types';
 
 // Batch parameters
 export let currentBatchID = writable<string>('BatchID');
@@ -15,5 +16,5 @@ export let robotState = writable<RobotState>('Idle');
 export type TrainingState = 'Idle' | 'YOLO Detection' | 'Trajectory Generation' | 'Executing Trajectory';
 export let trainingState = writable<TrainingState>('Idle');
 
-export let currentTCPPose = writable<[number, number, number, number, number, number]>([0, 0, 0, 0, 0, 0]);
+export let currentTCPPose = writable<EulerPose>();
 export let detectedObjectPosition = writable<[number, number, number] | null>(null);

@@ -18,6 +18,7 @@ export class RobotViewer {
 	private camera: THREE.PerspectiveCamera;
 	private renderer: THREE.WebGLRenderer;
 	private controls: OrbitControls;
+	private tcpMarker: THREE.Mesh;
 
 	private robot: URDFRobot | null = null;
 	private resizeObserver: ResizeObserver;
@@ -54,6 +55,8 @@ export class RobotViewer {
 
         this.setupLights();
         this.setupGround();
+		this.tcpMarker = this.createTcpMarker();
+		this.scene.add(this.tcpMarker);
 
         this.resizeObserver = new ResizeObserver(() => this.handleResize());
         this.resizeObserver.observe(canvas);
@@ -158,6 +161,50 @@ export class RobotViewer {
 		this.robot.setJointValues(values);
 	}
 
+	/**
+	 * Returns the world-space position of a named URDF frame after the current
+	 * joint values have been applied.
+	 */
+	getFramePose(frameName: string): { position: THREE.Vector3, rotation: THREE.Euler } | undefined {
+		if (!this.robot) return undefined;
+		const frame = this.robot.getFrame(frameName);
+		if (!frame) return undefined;
+
+		this.robot.updateMatrixWorld(true);
+
+		const position = new THREE.Vector3();
+		frame.getWorldPosition(position);
+        const q = new THREE.Quaternion();
+        frame.getWorldQuaternion(q);
+        const euler = new THREE.Euler().setFromQuaternion(q, 'ZYX');
+
+		return { position: position, rotation: euler };
+	}
+
+	getToolheadCenterPose(): { position: THREE.Vector3, rotation: THREE.Euler } | undefined {
+		return this.getFramePose('gripper_tip') ?? this.getFramePose('tool0');
+	}
+
+	private createTcpMarker(): THREE.Mesh {
+		const geometry = new THREE.SphereGeometry(0.02, 24, 16);
+		const material = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+		const marker = new THREE.Mesh(geometry, material);
+		marker.visible = false;
+		marker.renderOrder = 999;
+		return marker;
+	}
+
+	private updateTcpMarker() {
+		const pose = this.getToolheadCenterPose();
+		if (!pose) {
+			this.tcpMarker.visible = false;
+			return;
+		}
+
+		this.tcpMarker.visible = true;
+		this.tcpMarker.position.copy(pose.position);
+	}
+
 	addObject(object: THREE.Object3D): void {
 		this.scene.add(object);
 	}
@@ -199,6 +246,7 @@ export class RobotViewer {
 		if (this.disposed) return;
 		this.frameId = requestAnimationFrame(this.animate);
 		this.controls.update();
+		this.updateTcpMarker();
 		this.renderer.render(this.scene, this.camera);
 	};
 

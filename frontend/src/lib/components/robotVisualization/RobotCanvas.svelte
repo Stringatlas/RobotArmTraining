@@ -2,11 +2,13 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { RobotViewer } from './robotViewer';
 	import {
-		robotState,
+		robotJointValues,
+		toolheadPose,
 		setRobotJoint,
 		setRobotJoints,
-		type RobotJointName
 	} from '$lib/state/robotState';
+
+    import type { RobotJointName } from '$lib/types';
 
     interface Props {
         urdfUrl: string;
@@ -35,15 +37,23 @@
 		joint_6: 0
 	});
 
-    
+	function syncToolheadPose() {
+		const pose = viewer?.getToolheadCenterPose();
+		if (!pose) return;
+        const position = pose?.position;
+        const rotation = pose.rotation;
+		toolheadPose.set({position: [position.x, position.y, position.z], orientation: [rotation.x, rotation.y, rotation.z]});
+	}
+  
 	$effect(() => {
 		viewer_ = viewer;
 	});
 
 	onMount(() => {
-		const unsubscribe = robotState.subscribe((values) => {
+		const unsubscribe = robotJointValues.subscribe((values) => {
 			latestJointValues = values;
 			viewer?.setJointAngles(values);
+			syncToolheadPose();
 		});
 
 		viewer = new RobotViewer(canvas, { urdfUrl, workingPath, backgroundColor });
@@ -52,6 +62,7 @@
 			.then(() => {
 				loaded = true;
 				viewer?.setJointAngles(latestJointValues);
+				syncToolheadPose();
 			})
 			.catch((err) => {
 				loadError = err instanceof Error ? err.message : String(err);
@@ -70,11 +81,13 @@
 	export function setJointAngle(jointName: string, value: number) {
 		if (!viewer?.setJointAngle(jointName, value)) return;
 		setRobotJoint(jointName as RobotJointName, value);
+		syncToolheadPose();
 	}
 
 	export function setJointAngles(values: Record<string, number>) {
 		viewer?.setJointAngles(values);
 		setRobotJoints(values as Partial<Record<RobotJointName, number>>);
+		syncToolheadPose();
 	}
 
 	export function setJoint1(value: number) {

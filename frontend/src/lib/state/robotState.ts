@@ -1,11 +1,8 @@
 import { writable } from 'svelte/store';
 import type { Vec3 } from '$lib/components/splineVisualization/spline';
+import type { RobotJointName, RobotJointValues, EulerPose as ToolheadPose } from '$lib/types';
 
-export type RobotJointName = 'joint_1' | 'joint_2' | 'joint_3' | 'joint_4' | 'joint_5' | 'joint_6';
-
-export type RobotJointValues = Record<RobotJointName, number>;
-
-export interface CurrentTrajectory {
+export interface Trajectory {
 	start: Vec3;
 	end: Vec3;
 	controlScaling: number;
@@ -15,16 +12,17 @@ export interface CurrentTrajectory {
 
 export const initialRobotJointValues: RobotJointValues = {
 	joint_1: 0,
-	joint_2: 0,
-	joint_3: 0,
-	joint_4: 0,
-	joint_5: 0,
+	joint_2: -1,
+	joint_3: 2.4,
+	joint_4: -1.4,
+	joint_5: 1.57,
 	joint_6: 0
 };
 
-export const robotState = writable<RobotJointValues>({ ...initialRobotJointValues });
+export const robotJointValues = writable<RobotJointValues>({ ...initialRobotJointValues });
+export const toolheadPose = writable<ToolheadPose>({position: [0, 0, 0], orientation: [0,0,0]});
 
-export const initialCurrentTrajectory: CurrentTrajectory = {
+export const initialCurrentTrajectory: Trajectory = {
 	start: [0, 0, 0],
 	end: [-0.5, 0.5, 0.5],
 	controlScaling: 1,
@@ -32,27 +30,27 @@ export const initialCurrentTrajectory: CurrentTrajectory = {
 	lineSamples: 100
 };
 
-export const currentTrajectory = writable<CurrentTrajectory>({ ...initialCurrentTrajectory });
+export const currentTrajectory = writable<Trajectory>({ ...initialCurrentTrajectory });
 
 export function setRobotJoint(name: RobotJointName, value: number) {
-	robotState.update((state) => ({
+	robotJointValues.update((state) => ({
 		...state,
 		[name]: value
 	}));
 }
 
 export function setRobotJoints(values: Partial<RobotJointValues>) {
-	robotState.update((state) => ({
+	robotJointValues.update((state) => ({
 		...state,
 		...values
 	}));
 }
 
 export function resetRobotJoints() {
-	robotState.set({ ...initialRobotJointValues });
+	robotJointValues.set({ ...initialRobotJointValues });
 }
 
-export function setCurrentTrajectory(values: Partial<CurrentTrajectory>) {
+export function setCurrentTrajectory(values: Partial<Trajectory>) {
 	currentTrajectory.update((state) => ({
 		...state,
 		...values
