@@ -1,100 +1,99 @@
 <script lang="ts">
     import { toolheadPose } from "$lib/state/robotState";
+    import { currentTrajectory } from "$lib/state/trajectoryState";
+    import { requestTrajectory } from "$lib/adapter/trajectory"
+    import type { EulerPose } from "$lib/types";
 
-    let position = $derived(
+    let currentPosition = $derived(
         $toolheadPose.position.map(n => n.toFixed(2))
     );
 
-    let orientation = $derived(
+    let currentOrientation = $derived(
         $toolheadPose.orientation.map(n => n.toFixed(2))
     );
+
+    let startPose = $state({ x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 });
+    let endPose = $state({ x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 });
+
+    function recordStart() {
+        startPose = {
+            x: parseFloat(currentPosition[0]),
+            y: parseFloat(currentPosition[1]),
+            z: parseFloat(currentPosition[2]),
+            rx: parseFloat(currentOrientation[0]),
+            ry: parseFloat(currentOrientation[1]),
+            rz: parseFloat(currentOrientation[2])
+        };
+    }
+
+    function recordEnd() {
+        endPose = {
+            x: parseFloat(currentPosition[0]),
+            y: parseFloat(currentPosition[1]),
+            z: parseFloat(currentPosition[2]),
+            rx: parseFloat(currentOrientation[0]),
+            ry: parseFloat(currentOrientation[1]),
+            rz: parseFloat(currentOrientation[2])
+        };
+    }
+
+    async function generateSpline() {
+        let start: EulerPose = {position: [startPose.x, startPose.y, startPose.z], orientation: [startPose.rx, startPose.ry, startPose.rz]}
+        let end: EulerPose = {position: [endPose.x, endPose.y, endPose.z], orientation: [endPose.rx, endPose.ry, endPose.rz]}
+        let trajectory: EulerPose[] = await requestTrajectory(start, end);
+        $currentTrajectory = trajectory;
+    }
+
 </script>
 
 <div class="panel">
     <section class="section">
         <h2>Toolhead Position</h2>
         <div class="pose-grid">
-            <span class="label">X</span><span class="value">{position[0]}</span>
-            <span class="label">Y</span><span class="value">{position[1]}</span>
-            <span class="label">Z</span><span class="value">{position[2]}</span>
+            <span class="label">X</span><span class="value">{currentPosition[0]}</span>
+            <span class="label">Y</span><span class="value">{currentPosition[1]}</span>
+            <span class="label">Z</span><span class="value">{currentPosition[2]}</span>
         </div>
         <h2>Toolhead Orientation</h2>
         <div class="pose-grid">
-            <span class="label">X</span><span class="value">{orientation[0]}</span>
-            <span class="label">Y</span><span class="value">{orientation[1]}</span>
-            <span class="label">Z</span><span class="value">{orientation[2]}</span>
+            <span class="label">X</span><span class="value">{currentOrientation[0]}</span>
+            <span class="label">Y</span><span class="value">{currentOrientation[1]}</span>
+            <span class="label">Z</span><span class="value">{currentOrientation[2]}</span>
         </div>
     </section>
 
     <section class="section spline-section">
         <h2>Test Spline Generation</h2>
-
         <div class="pose-columns">
             <div class="pose-card">
                 <h3>Start Pose</h3>
-                <button>Record Start Pose</button>
-
+                <button onclick={recordStart}>Record Start Pose</button>
                 <div class="compact-pose">
                     <h4>Current Pose</h4>
-
-                    <label>
-                        X
-                        <input value="0.00" />
-                    </label>
-                    <label>
-                        Y
-                        <input value="0.00" />
-                    </label>
-                    <label>
-                        Z
-                        <input value="0.00" />
-                    </label>
-                    <label>
-                        RX
-                        <input value="0.00" />
-                    </label>
-                    <label>
-                        RY
-                        <input value="0.00" />
-                    </label>
-                    <label>
-                        RZ
-                        <input value="0.00" />
-                    </label>
+                    <label>X <input type="number" bind:value={startPose.x} step="0.01" /></label>
+                    <label>Y <input type="number" bind:value={startPose.y} step="0.01" /></label>
+                    <label>Z <input type="number" bind:value={startPose.z} step="0.01" /></label>
+                    <label>RX <input type="number" bind:value={startPose.rx} step="0.01" /></label>
+                    <label>RY <input type="number" bind:value={startPose.ry} step="0.01" /></label>
+                    <label>RZ <input type="number" bind:value={startPose.rz} step="0.01" /></label>
                 </div>
             </div>
 
             <div class="pose-card">
                 <h3>End Pose</h3>
-                <button>Record End Pose</button>
-
+                <button onclick={recordEnd}>Record End Pose</button>
                 <div class="compact-pose">
                     <h4>Current Pose</h4>
-
-                    <label>
-                        X
-                        <input value="0.00" />
-                    </label>
-                    <label>
-                        Y
-                        <input value="0.00" />
-                    </label>
-                    <label>
-                        Z
-                        <input value="0.00" />
-                    </label>
-                    <label>
-                        RX
-                        <input value="0.00" />
-                    </label>
-                    <label>
-                        RY
-                        <input value="0.00" />
-                    </label>
-                    <label>RZ<input value="0.00" /></label>
+                    <label>X <input type="number" bind:value={endPose.x} step="0.01" /></label>
+                    <label>Y <input type="number" bind:value={endPose.y} step="0.01" /></label>
+                    <label>Z <input type="number" bind:value={endPose.z} step="0.01" /></label>
+                    <label>RX <input type="number" bind:value={endPose.rx} step="0.01" /></label>
+                    <label>RY <input type="number" bind:value={endPose.ry} step="0.01" /></label>
+                    <label>RZ <input type="number" bind:value={endPose.rz} step="0.01" /></label>
                 </div>
             </div>
         </div>
+        <button onclick={generateSpline}>Generate Spline</button>
     </section>
 
     <section class="section">
@@ -103,56 +102,32 @@
 </div>
 
 <style>
-	.panel {
-		box-sizing: border-box;
-		width: 100%;
-		height: 100%;
-		padding: 1rem;
-		display: grid;
-		gap: 1rem;
-		align-content: start;
-		background: #0b1220;
-		color: #e2e8f0;
-	}
+    .panel {
+        box-sizing: border-box;
+        width: 100%;
+        height: 100%;
+        padding: 1rem;
+        display: grid;
+        gap: 1rem;
+        align-content: start;
+        background: #0b1220;
+        color: #e2e8f0;
+    }
 
-	.section {
-		display: grid;
-		gap: 0.75rem;
-		padding: 1rem;
-		border: 1px solid #334155;
-		background: #111827;
-	}
+    .section {
+        display: grid;
+        gap: 0.75rem;
+        padding: 1rem;
+        border: 1px solid #334155;
+        background: #111827;
+    }
 
-	h2 {
-		margin: 0;
-		font-size: 1rem;
-		font-weight: 600;
-	}
+    h2 {
+        margin: 0;
+        font-size: 1rem;
+        font-weight: 600;
+    }
 
-	label {
-		display: grid;
-		gap: 0.35rem;
-	}
-
-	span {
-		font-size: 0.875rem;
-		color: #cbd5e1;
-	}
-
-	input {
-		width: 100%;
-		box-sizing: border-box;
-		padding: 0.5rem 0.625rem;
-		border: 1px solid #475569;
-		border-radius: 0;
-		background: #0f172a;
-		color: #e2e8f0;
-	}
-
-	input:focus {
-		outline: 2px solid #60a5fa;
-		outline-offset: 1px;
-	}
     .pose-grid {
         display: grid;
         grid-template-columns: auto auto;
@@ -196,7 +171,7 @@
         font-weight: 600;
     }
 
-    .pose-card button {
+    button {
         width: fit-content;
         padding: 0.25rem 0.5rem;
         border: 1px solid #475569;
@@ -205,15 +180,14 @@
         cursor: pointer;
     }
 
-    .pose-card button:hover {
+    button:hover {
         background: #334155;
     }
 
     .compact-pose {
         display: grid;
-        grid-template-columns: auto 1fr;
+        grid-template-columns: repeat(3, 1fr);
         gap: 0.25rem 0.5rem;
-        align-items: center;
     }
 
     .compact-pose h4 {
@@ -224,14 +198,28 @@
     }
 
     .compact-pose label {
-        display: contents;
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
         font-size: 0.75rem;
         color: #cbd5e1;
     }
 
     .compact-pose input {
+        flex: 1;
         padding: 0.15rem 0.35rem;
         font-size: 0.8rem;
         height: 1.5rem;
+        border: 1px solid #475569;
+        border-radius: 0;
+        background: #0f172a;
+        color: #e2e8f0;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .compact-pose input:focus {
+        outline: 2px solid #60a5fa;
+        outline-offset: 1px;
     }
 </style>

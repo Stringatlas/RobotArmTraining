@@ -24,23 +24,23 @@ function convertQuaternionToEuler(pose: QuaternionPose): EulerPose {
 }
 
 
-async function requestTrajectory(currentPose: EulerPose, targetPose: EulerPose): Promise<QuaternionPose[]> {
+export async function requestTrajectory(currentPose: EulerPose, targetPose: EulerPose): Promise<EulerPose[]> {
     let convertedCurrentPose = convertEulerToQuaternion(currentPose);
     let convertedTargetPose = convertEulerToQuaternion(targetPose);
-    const res = await fetch('http://localhost:8000/trajectory/generate', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      current_pose: convertedCurrentPose,   // { position: [x,y,z], orientation: [x,y,z,w] }
-      target_pose: convertedTargetPose
-    })
-  });
+    const res = await fetch("api/trajectory/generate", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+        current_pose: convertedCurrentPose,   // { position: [x,y,z], orientation: [x,y,z,w] }
+        target_pose: convertedTargetPose
+        })
+    });
 
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(`Trajectory request failed: ${JSON.stringify(err.detail)}`);
-  }
+    if (!res.ok) {
+        const err = await res.json();
+        throw new Error(`Trajectory request failed: ${JSON.stringify(err.detail)}`);
+    }
 
-  const data = await res.json();
-  return data.waypoints;
+    const data = await res.json();
+    return data.waypoints.map((pose: QuaternionPose) => convertQuaternionToEuler(pose));
 }

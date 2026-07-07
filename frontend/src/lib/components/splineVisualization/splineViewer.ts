@@ -1,13 +1,12 @@
 import * as THREE from 'three';
-import { Spline3D, type Vec3 } from './spline';
-import type { Trajectory } from '$lib/state/robotState';
+import type { EulerPose } from '$lib/types';
 
 export interface SplineTrajectoryViewerOptions {
 	backgroundColor?: number;
 }
 
-function toVector3(value: Vec3) {
-	return new THREE.Vector3(value[0], value[1], value[2]);
+function toVector3(pose: EulerPose) {
+	return new THREE.Vector3(pose.position[0], pose.position[1], pose.position[2]);
 }
 
 export interface SplineTrajectoryObjectOptions {
@@ -23,31 +22,33 @@ export class SplineTrajectoryObjectBuilder {
 		this.options = options;
 	}
 
-	create(trajectory: Trajectory): THREE.Group {
-		const spline = new Spline3D(trajectory.start, trajectory.end, trajectory.controlScaling);
-		const samplePointCount = Math.max(2, Math.floor(trajectory.samplePoints));
-		const linePointCount = Math.max(2, Math.floor(trajectory.lineSamples));
-
+	create(trajectory: EulerPose[]): THREE.Group {
 		const group = new THREE.Group();
-		group.name = 'spline-trajectory';
+		group.name = 'trajectory-waypoints';
 
-		const linePoints = spline.sampleUniform(linePointCount);
-		const lineGeometry = new THREE.BufferGeometry().setFromPoints(linePoints.map(toVector3));
-		const lineMaterial = new THREE.LineBasicMaterial({
-			color: this.options.lineColor ?? 0x7dd3fc,
-			opacity: 0.95,
-			transparent: true
-		});
-		group.add(new THREE.Line(lineGeometry, lineMaterial));
+		if (trajectory.length === 0) {
+			return group;
+		}
 
-		const samplePoints = spline.sampleArcLength(samplePointCount);
-		const pointGeometry = new THREE.BufferGeometry().setFromPoints(samplePoints.map(toVector3));
+		const points = trajectory.map(toVector3);
+
+		const pointGeometry = new THREE.BufferGeometry().setFromPoints(points);
 		const pointMaterial = new THREE.PointsMaterial({
 			color: this.options.pointColor ?? 0x22c55e,
-			size: this.options.pointSize ?? 0.06,
+			size: this.options.pointSize ?? 0.01,
 			sizeAttenuation: true
 		});
 		group.add(new THREE.Points(pointGeometry, pointMaterial));
+
+		if (points.length > 1) {
+			const lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
+			const lineMaterial = new THREE.LineBasicMaterial({
+				color: this.options.lineColor ?? 0x7dd3fc,
+				opacity: 0.95,
+				transparent: true
+			});
+			group.add(new THREE.Line(lineGeometry, lineMaterial));
+		}
 
 		return group;
 	}

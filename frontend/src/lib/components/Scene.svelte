@@ -4,16 +4,13 @@
 	import RobotCanvas from './robotVisualization/RobotCanvas.svelte';
 	import { RobotViewer } from './robotVisualization/robotViewer';
 	import { SplineTrajectoryObjectBuilder } from './splineVisualization/splineViewer';
+	import { currentTrajectory } from '$lib/state/trajectoryState';
 	import {
-		currentTrajectory,
-		initialCurrentTrajectory,
 		initialRobotJointValues,
 		robotJointValues,
 		setRobotJoint,
-		type Trajectory,
 	} from '$lib/state/robotState';
-    import type { RobotJointName } from '$lib/types';
-	import { clearSplineObject, setSplineObject } from '$lib/state/splineObject';
+	import type { EulerPose, RobotJointName } from '$lib/types';
 
 	interface Props {
 		urdfUrl: string;
@@ -34,7 +31,7 @@
 
 	const DEFAULT_LIMIT: JointRange = { lower: -6.28, upper: 6.28 };
 
-	const splineBuilder = new SplineTrajectoryObjectBuilder({pointSize: 0.03});
+	const splineBuilder = new SplineTrajectoryObjectBuilder({ pointSize: 0.03 });
 
 	let {
 		urdfUrl,
@@ -45,15 +42,11 @@
 	let viewer = $state<RobotViewer | undefined>(undefined);
 	let jointValues = $state({ ...initialRobotJointValues });
 	let jointLimits = $state<Partial<Record<RobotJointName, JointRange>>>({});
-	let currentTrajectoryValue = $state<Trajectory>({ ...initialCurrentTrajectory });
 	let showTrajectory = $state(true);
-    let showJoints = $state(true);
+	let showJoints = $state(true);
+	let currentTrajectoryValue = $state<EulerPose[]>([]);
 
-	let activeSplineObject: THREE.Group | undefined;
-
-	function clamp(value: number, min: number, max: number) {
-		return Math.min(Math.max(value, min), max);
-	}
+	let trajectoryObject: THREE.Group | undefined;
 
 	function formatAngle(value: number) {
 		return `${value.toFixed(2)}`;
@@ -61,12 +54,6 @@
 
 	function getLimits(name: RobotJointName): JointRange {
 		return jointLimits[name] ?? DEFAULT_LIMIT;
-	}
-
-	function getProgress(name: RobotJointName) {
-		const { lower, upper } = getLimits(name);
-		const span = upper - lower || 1;
-		return clamp((jointValues[name] - lower) / span, 0, 1);
 	}
 
 	function setJointFromInput(name: RobotJointName, event: Event) {
@@ -92,19 +79,17 @@
 	}
 
 	function syncSplineObject() {
-		if (activeSplineObject && viewer) {
-			viewer.removeObject(activeSplineObject);
-			disposeObject(activeSplineObject);
-			activeSplineObject = undefined;
-			clearSplineObject();
+		if (trajectoryObject && viewer) {
+			viewer.removeObject(trajectoryObject);
+			disposeObject(trajectoryObject);
+			trajectoryObject = undefined;
 		}
 
 		if (!viewer || !showTrajectory) return;
 
 		const nextObject = splineBuilder.create(currentTrajectoryValue);
 		viewer.addObject(nextObject);
-		activeSplineObject = nextObject;
-		setSplineObject(nextObject);
+		trajectoryObject = nextObject;
 	}
 
 	function syncJointLimits() {
@@ -172,12 +157,11 @@
 	});
 
 	onDestroy(() => {
-		if (activeSplineObject && viewer) {
-			viewer.removeObject(activeSplineObject);
-			disposeObject(activeSplineObject);
+		if (trajectoryObject && viewer) {
+			viewer.removeObject(trajectoryObject);
+			disposeObject(trajectoryObject);
 		}
-		activeSplineObject = undefined;
-		clearSplineObject();
+		trajectoryObject = undefined;
 	});
 </script>
 
@@ -189,18 +173,18 @@
 		backgroundColor={backgroundColor}
 	/>
 
-	<div class="slider-overlay" aria-label="Scene controls">   
-        <div class="toggle-row">
-            <label class="toggle-row">
-                <input bind:checked={showTrajectory} type="checkbox" aria-label="Show trajectory" />
-                <span>Trajectory</span>
-            </label>
+	<div class="slider-overlay" aria-label="Scene controls">
+		<div class="toggle-row">
+			<label class="toggle-row">
+				<input bind:checked={showTrajectory} type="checkbox" aria-label="Show trajectory" />
+				<span>Trajectory</span>
+			</label>
 
-            <label class="toggle-row">
-                <input bind:checked={showJoints} type="checkbox" aria-label="Show joints" />
-                <span>Joints</span>
-            </label>
-        </div>
+			<label class="toggle-row">
+				<input bind:checked={showJoints} type="checkbox" aria-label="Show joints" />
+				<span>Joints</span>
+			</label>
+		</div>
 
 		{#each JOINTS as joint}
 			{@const limits = getLimits(joint.name)}
@@ -208,21 +192,21 @@
 			<div class="slider-row">
 				<span class="slider-label">{joint.label}</span>
 				<span class="slider-value">{formatAngle(value)}</span>
-                {#if showJoints}
-                    <input
-                        class="slider-input"
-                        type="range"
-                        min={limits.lower}
-                        max={limits.upper}
-                        step="0.01"
-                        value={value}
-                        aria-label={`${joint.label} angle`}
-                        aria-valuemin={limits.lower}
-                        aria-valuemax={limits.upper}
-                        aria-valuenow={value}
-                        oninput={(event) => setJointFromInput(joint.name, event)}
-                    />
-                {/if}
+				{#if showJoints}
+					<input
+						class="slider-input"
+						type="range"
+						min={limits.lower}
+						max={limits.upper}
+						step="0.01"
+						value={value}
+						aria-label={`${joint.label} angle`}
+						aria-valuemin={limits.lower}
+						aria-valuemax={limits.upper}
+						aria-valuenow={value}
+						oninput={(event) => setJointFromInput(joint.name, event)}
+					/>
+				{/if}
 			</div>
 		{/each}
 	</div>
