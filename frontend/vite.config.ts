@@ -19,7 +19,16 @@ export default defineConfig({
 	],
     server: {
         proxy: {
-            '/api': 'http://localhost:8000'
-        }
+            '/api': {
+                target: 'http://localhost:8000',
+                ws: true,
+                changeOrigin: true
+            },
+            '/robot_api': {
+                target: 'http://localhost:5000',
+                changeOrigin: true,
+                rewrite: (path) => path.replace(/^\/robot_api/, '')
+            }
+        },
     }
 });

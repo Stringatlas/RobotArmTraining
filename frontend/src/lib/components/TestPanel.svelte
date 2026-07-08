@@ -3,6 +3,7 @@
     import { currentTrajectory } from "$lib/state/trajectoryState";
     import { requestTrajectory } from "$lib/adapter/trajectory"
     import type { EulerPose } from "$lib/types";
+    import { telemetryStatus, startTelemetry, stopTelemetry } from "$lib/adapter/telemetry";
 
     let currentPosition = $derived(
         $toolheadPose.position.map(n => n.toFixed(2))
@@ -41,9 +42,7 @@
         let start: EulerPose = {position: [startPose.x, startPose.y, startPose.z], orientation: [startPose.rx, startPose.ry, startPose.rz]}
         let end: EulerPose = {position: [endPose.x, endPose.y, endPose.z], orientation: [endPose.rx, endPose.ry, endPose.rz]}
         let trajectory: EulerPose[] = await requestTrajectory(start, end);
-        $currentTrajectory = trajectory;
     }
-
 </script>
 
 <div class="panel">
@@ -97,7 +96,10 @@
     </section>
 
     <section class="section">
-        <h2>Status</h2>
+        <h2>Telemetry</h2>
+        <p>Telemetry status: {$telemetryStatus}</p>
+        <button onclick={startTelemetry}>Sync Robot With Telemetry</button>
+        <button onclick={stopTelemetry}>Stop Robot Telemetry</button>
     </section>
 </div>
 

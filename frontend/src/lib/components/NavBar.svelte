@@ -1,6 +1,7 @@
 <script lang="ts">
-	type BackendStatus = 'checking' | 'ok' | 'down';
-	let backendStatus = $state<BackendStatus>('checking');
+	type Status = 'checking' | 'ok' | 'down';
+	let backendStatus = $state<Status>('checking');
+    let robotStatus = $state<Status>('checking');
 
 	async function checkBackendStatus() {
 		try {
@@ -13,10 +14,22 @@
 		}
 	}
 
+    async function checkRobotStatus() {
+		try {
+			const response = await fetch('/robot_api/health');
+			await response.json();
+			robotStatus = response.ok ? 'ok' : 'down';
+		} catch (err) {
+			console.error('Robot unreachable:', err);
+			robotStatus = 'down';
+		}
+	}
+
 	$effect(() => {
 		checkBackendStatus();
+        checkRobotStatus();
 
-		const interval = setInterval(checkBackendStatus, 5000);
+		const interval = setInterval(() => {checkBackendStatus(); checkRobotStatus();}, 5000);
 		return () => clearInterval(interval);
 	});
 </script>
@@ -26,9 +39,14 @@
 	<a href="/label">Label</a>
 	<a href="/test">Test API</a>
 
-	<div class="status" title={`Backend: ${backendStatus}`}>
+	<div class="status" title={`Backend Status`}>
+        <span>Backend: </span>
 		<span class="status-dot {backendStatus}"></span>
 		<span class="status-label">{backendStatus}</span>
+        <span>   </span>
+        <span>Robot: </span>
+		<span class="status-dot {robotStatus}"></span>
+		<span class="status-label">{robotStatus}</span>
 	</div>
 </nav>
 

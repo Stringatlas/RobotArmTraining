@@ -1,5 +1,6 @@
 import type { EulerPose, QuaternionPose } from '$lib/types';
 import { Euler, Quaternion } from 'three';
+import { currentTrajectory } from '$lib/state/trajectoryState';
 
 function convertEulerToQuaternion(pose: EulerPose): QuaternionPose {
     const q = new Quaternion().setFromEuler(
@@ -23,7 +24,6 @@ function convertQuaternionToEuler(pose: QuaternionPose): EulerPose {
     };
 }
 
-
 export async function requestTrajectory(currentPose: EulerPose, targetPose: EulerPose): Promise<EulerPose[]> {
     let convertedCurrentPose = convertEulerToQuaternion(currentPose);
     let convertedTargetPose = convertEulerToQuaternion(targetPose);
@@ -42,5 +42,7 @@ export async function requestTrajectory(currentPose: EulerPose, targetPose: Eule
     }
 
     const data = await res.json();
-    return data.waypoints.map((pose: QuaternionPose) => convertQuaternionToEuler(pose));
+    let trajectory = data.waypoints.map((pose: QuaternionPose) => convertQuaternionToEuler(pose))
+    currentTrajectory.set(trajectory);
+    return trajectory;
 }
