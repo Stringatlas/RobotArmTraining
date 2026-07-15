@@ -1,5 +1,5 @@
 import { writable } from 'svelte/store';
-import { robotJointValues, toolheadPose } from '$lib/state/robotState';
+import { robotJointValues, toolheadPose, robotMovementState } from '$lib/state/robotState';
 import type { RobotJointValues, EulerPose as ToolheadPose } from '$lib/types'; 
 
 const WS_PATH = '/api/telemetry/ws';
@@ -29,23 +29,6 @@ function toRobotJointValues(jointPos: number[]): RobotJointValues {
 	};
 }
 
-/**
- * Backend sends tcp_pose as {x,y,z,rx,ry,rz}. Convert to the
- * position/orientation tuple shape the store expects.
- */
-function toToolheadPose(tcpPose: {
-	x: number;
-	y: number;
-	z: number;
-	rx: number;
-	ry: number;
-	rz: number;
-}): ToolheadPose {
-	return {
-		position: [tcpPose.x, tcpPose.y, tcpPose.z],
-		orientation: [tcpPose.rx, tcpPose.ry, tcpPose.rz]
-	};
-}
 
 // --- Wire message shape -----------------------------------------------
 
@@ -126,7 +109,8 @@ function connect(): void {
 
 		try {
 			robotJointValues.set(toRobotJointValues(parsed.joint_pos));
-			toolheadPose.set(toToolheadPose(parsed.tcp_pose));
+			toolheadPose.set(parsed.tcp_pose);
+            robotMovementState.set(parsed.state);
 			latestRobotState = parsed.state;
 			markMessageReceived();
 		} catch (err) {

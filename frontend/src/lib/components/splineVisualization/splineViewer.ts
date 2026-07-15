@@ -6,7 +6,7 @@ export interface SplineTrajectoryViewerOptions {
 }
 
 function toVector3(pose: EulerPose) {
-	return new THREE.Vector3(pose.position[0], pose.position[1], pose.position[2]);
+	return new THREE.Vector3(pose.x, pose.y, pose.z);
 }
 
 export interface SplineTrajectoryObjectOptions {

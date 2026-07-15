@@ -13,7 +13,7 @@ class TrajectoryParams:
     approach_height: float = 0.05   # meters, arrival control-point offset
     retreat_direction: np.ndarray = None   # defaults to +Z if None
     approach_direction: np.ndarray = None  # defaults to -Z (straight down) if None
-    n_waypoints: int = 50
+    n_waypoints: int = 20
     arc_length_samples: int = 200
 
     def __post_init__(self):

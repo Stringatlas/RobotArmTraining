@@ -4,44 +4,56 @@
     import { requestTrajectory } from "$lib/adapter/trajectory"
     import type { EulerPose } from "$lib/types";
     import { telemetryStatus, startTelemetry, stopTelemetry } from "$lib/adapter/telemetry";
+    import { convertEulerToQuaternion, convertQuaternionToEuler } from "$lib/adapter/trajectory";
 
-    let currentPosition = $derived(
-        $toolheadPose.position.map(n => n.toFixed(2))
-    );
-
-    let currentOrientation = $derived(
-        $toolheadPose.orientation.map(n => n.toFixed(2))
+    let roundedCurrentPose = $derived({
+            x: $toolheadPose.x.toFixed(3),
+            y: $toolheadPose.y.toFixed(3),
+            z: $toolheadPose.z.toFixed(3),
+            rx: $toolheadPose.rx.toFixed(3),
+            ry: $toolheadPose.ry.toFixed(3),
+            rz: $toolheadPose.rz.toFixed(3)
+        }
     );
 
     let startPose = $state({ x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 });
     let endPose = $state({ x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 });
 
     function recordStart() {
-        startPose = {
-            x: parseFloat(currentPosition[0]),
-            y: parseFloat(currentPosition[1]),
-            z: parseFloat(currentPosition[2]),
-            rx: parseFloat(currentOrientation[0]),
-            ry: parseFloat(currentOrientation[1]),
-            rz: parseFloat(currentOrientation[2])
-        };
+        startPose = $toolheadPose;
     }
 
     function recordEnd() {
-        endPose = {
-            x: parseFloat(currentPosition[0]),
-            y: parseFloat(currentPosition[1]),
-            z: parseFloat(currentPosition[2]),
-            rx: parseFloat(currentOrientation[0]),
-            ry: parseFloat(currentOrientation[1]),
-            rz: parseFloat(currentOrientation[2])
-        };
+        endPose = $toolheadPose;
     }
 
     async function generateSpline() {
-        let start: EulerPose = {position: [startPose.x, startPose.y, startPose.z], orientation: [startPose.rx, startPose.ry, startPose.rz]}
-        let end: EulerPose = {position: [endPose.x, endPose.y, endPose.z], orientation: [endPose.rx, endPose.ry, endPose.rz]}
-        let trajectory: EulerPose[] = await requestTrajectory(start, end);
+        let start: EulerPose = startPose;
+        let end: EulerPose = endPose;
+        await requestTrajectory(start, end);
+    }
+
+    // TODO: TEMPORARY, SHOULD CALL BACKEND INSTEAD OF ROBOT
+    function followTrajectory() {
+        let convertedTrajectory = $currentTrajectory;
+        fetch('/robot_api/follow_trajectory', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                waypoints: convertedTrajectory,
+                acc: 0.5,
+                vel: 0.5,
+                blend_radius: 0.05
+            })
+        });
+    }
+
+    function enableTeachMode() {
+        fetch('/robot_api/enable_teach_mode', {
+            method: 'POST'
+        });
     }
 </script>
 
@@ -49,15 +61,15 @@
     <section class="section">
         <h2>Toolhead Position</h2>
         <div class="pose-grid">
-            <span class="label">X</span><span class="value">{currentPosition[0]}</span>
-            <span class="label">Y</span><span class="value">{currentPosition[1]}</span>
-            <span class="label">Z</span><span class="value">{currentPosition[2]}</span>
+            <span class="label">X</span><span class="value">{roundedCurrentPose.x}</span>
+            <span class="label">Y</span><span class="value">{roundedCurrentPose.y}</span>
+            <span class="label">Z</span><span class="value">{roundedCurrentPose.z}</span>
         </div>
         <h2>Toolhead Orientation</h2>
         <div class="pose-grid">
-            <span class="label">X</span><span class="value">{currentOrientation[0]}</span>
-            <span class="label">Y</span><span class="value">{currentOrientation[1]}</span>
-            <span class="label">Z</span><span class="value">{currentOrientation[2]}</span>
+            <span class="label">X</span><span class="value">{roundedCurrentPose.rx}</span>
+            <span class="label">Y</span><span class="value">{roundedCurrentPose.ry}</span>
+            <span class="label">Z</span><span class="value">{roundedCurrentPose.rz}</span>
         </div>
     </section>
 
@@ -93,6 +105,8 @@
             </div>
         </div>
         <button onclick={generateSpline}>Generate Spline</button>
+        <button onclick={followTrajectory}>Follow Trajectory</button>
+        <button onclick={enableTeachMode}>Enable Teach Mode</button>
     </section>
 
     <section class="section">
@@ -223,5 +237,10 @@
     .compact-pose input:focus {
         outline: 2px solid #60a5fa;
         outline-offset: 1px;
+    }
+    input::-webkit-outer-spin-button,
+    input::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
     }
 </style>

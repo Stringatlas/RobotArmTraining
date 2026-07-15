@@ -31,7 +31,7 @@ The frontend runs on `http://localhost:5173` and proxies API requests to the bac
 
 ### Connecting to Robot Client
 
-Ensure your robot service is running and exposing a WebSocket endpoint at `ws://localhost:5000/telemetry/ws`. The backend's `RobotClient` will maintain a persistent connection to this endpoint and relay telemetry data to the frontend [3](#0-2) .
+Ensure your robot service is running and exposing a WebSocket endpoint at `ws://localhost:5000/telemetry/ws`. The backend's `RobotClient` will maintain a persistent connection to this endpoint and relay telemetry data to the frontend.
 
 ## Architecture
 

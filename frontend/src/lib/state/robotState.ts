@@ -11,7 +11,7 @@ export const initialRobotJointValues: RobotJointValues = {
 };
 
 export const robotJointValues = writable<RobotJointValues>({ ...initialRobotJointValues });
-export const toolheadPose = writable<ToolheadPose>({position: [0, 0, 0], orientation: [0,0,0]});
+export const toolheadPose = writable<ToolheadPose>({x: 0, y: 0, z: 0, rx: 0, ry: 0,rz: 0});
 
 export function setRobotJoint(name: RobotJointName, value: number) {
 	robotJointValues.update((state) => ({
@@ -30,3 +30,7 @@ export function setRobotJoints(values: Partial<RobotJointValues>) {
 export function resetRobotJoints() {
 	robotJointValues.set({ ...initialRobotJointValues });
 }
+
+export type RobotState = string;
+export let robotState = writable<RobotState>('IDLE');
+export let robotMovementState = writable<String>("idle");

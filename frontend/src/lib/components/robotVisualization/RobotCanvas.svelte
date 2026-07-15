@@ -42,7 +42,7 @@
 		if (!pose) return;
         const position = pose?.position;
         const rotation = pose.rotation;
-		toolheadPose.set({position: [position.x, position.y, position.z], orientation: [rotation.x, rotation.y, rotation.z]});
+		toolheadPose.set({x: position.x, y: position.y, z: position.z, rx: rotation.x, ry: rotation.y, rz: rotation.z});
 	}
   
 	$effect(() => {

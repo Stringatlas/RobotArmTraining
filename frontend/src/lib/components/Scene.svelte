@@ -43,7 +43,7 @@
 	let jointValues = $state({ ...initialRobotJointValues });
 	let jointLimits = $state<Partial<Record<RobotJointName, JointRange>>>({});
 	let showTrajectory = $state(true);
-	let showJoints = $state(true);
+	let showJoints = $state(false);
 	let currentTrajectoryValue = $state<EulerPose[]>([]);
 
 	let trajectoryObject: THREE.Group | undefined;
