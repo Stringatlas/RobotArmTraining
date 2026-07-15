@@ -1,15 +1,16 @@
 <script lang="ts">
 	type Status = 'checking' | 'ok' | 'down';
+    import { robotState } from '$lib/state/robotState';
 	let backendStatus = $state<Status>('checking');
     let robotStatus = $state<Status>('checking');
-
+    
 	async function checkBackendStatus() {
 		try {
 			const response = await fetch('/api/health');
 			await response.json();
 			backendStatus = response.ok ? 'ok' : 'down';
 		} catch (err) {
-			console.error('Backend unreachable:', err);
+			// console.error('Backend unreachable:', err);
 			backendStatus = 'down';
 		}
 	}
@@ -20,17 +21,48 @@
 			await response.json();
 			robotStatus = response.ok ? 'ok' : 'down';
 		} catch (err) {
-			console.error('Robot unreachable:', err);
+			// console.error('Robot unreachable:', err);
 			robotStatus = 'down';
 		}
 	}
 
+    async function checkRobotState() {
+        try {
+            const response = await fetch('/robot_api/state');
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            let json = await response.json();
+            $robotState = json.state;
+        } catch (err) {
+            // console.error('Robot unreachable:', err);
+        }
+    }
+
+    function emergencyStop() {
+        fetch('/robot_api/stop', {
+            method: 'POST'
+        });
+    }
+
+    function restart() {
+        fetch('/robot_api/restart', {
+            method: 'POST'
+        });
+    }
+
 	$effect(() => {
 		checkBackendStatus();
         checkRobotStatus();
+        checkRobotState();
 
-		const interval = setInterval(() => {checkBackendStatus(); checkRobotStatus();}, 5000);
-		return () => clearInterval(interval);
+		const interval = setInterval(() => {checkBackendStatus(); checkRobotStatus(); }, 5000);
+        const robotStateInterval = setInterval(() => {checkRobotState();}, 500);
+
+		return () => { 
+            clearInterval(interval);
+            clearInterval(robotStateInterval);
+        };
 	});
 </script>
 
@@ -47,6 +79,15 @@
         <span>Robot: </span>
 		<span class="status-dot {robotStatus}"></span>
 		<span class="status-label">{robotStatus}</span>
+        <span>   </span>
+        <span>Robot State: </span>
+		<span class="status-label">{$robotState}</span>
+        {#if $robotState.toLowerCase() === 'executing'}
+            <button onclick={emergencyStop}>Stop</button>
+        {/if}
+        {#if $robotState.toLowerCase() === 'estop'}
+            <button onclick={restart}>Restart</button>
+        {/if}
 	</div>
 </nav>
 
