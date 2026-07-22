@@ -1,6 +1,6 @@
 """Thin async client for the robot-side FastAPI service.
 
-This module owns the connection to the robot's /telemetry/ws and
+This module owns the connection to the robot's /telemetry/ws/robot and
 get_joint_angles / follow_trajectory REST calls. For the live-relay
 slice, only the telemetry side is wired up: connect, parse each raw
 sample, and hand it to whoever has subscribed (currently just

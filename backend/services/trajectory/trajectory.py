@@ -7,21 +7,22 @@ from services.trajectory.equal_arc_length import ArcLengthLUT
 from models.robot import Pose
 
 
+from dataclasses import dataclass, field
+from numpy.typing import NDArray
+import numpy as np
+
 @dataclass
 class TrajectoryParams:
-    lift_height: float = 0.08       # meters, departure control-point offset
-    approach_height: float = 0.05   # meters, arrival control-point offset
-    retreat_direction: np.ndarray = None   # defaults to +Z if None
-    approach_direction: np.ndarray = None  # defaults to -Z (straight down) if None
-    n_waypoints: int = 20
+    lift_height: float = 0.02
+    approach_height: float = 0.02
+    retreat_direction: NDArray[np.float64] = field(
+        default_factory=lambda: np.array([0.0, 0.0, 1.0])
+    )
+    approach_direction: NDArray[np.float64] = field(
+        default_factory=lambda: np.array([0.0, 0.0, -1.0])
+    )
+    n_waypoints: int = 3
     arc_length_samples: int = 200
-
-    def __post_init__(self):
-        if self.retreat_direction is None:
-            self.retreat_direction = np.array([0.0, 0.0, 1.0])
-        if self.approach_direction is None:
-            self.approach_direction = np.array([0.0, 0.0, -1.0])
-
 
 def _slerp(q0: np.ndarray, q1: np.ndarray, t: np.ndarray) -> np.ndarray:
     """

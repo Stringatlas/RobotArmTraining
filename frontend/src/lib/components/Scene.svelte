@@ -9,6 +9,7 @@
 		initialRobotJointValues,
 		robotJointValues,
 		setRobotJoint,
+        gripperValue,
 	} from '$lib/state/robotState';
 	import type { EulerPose, RobotJointName } from '$lib/types';
 
@@ -26,11 +27,10 @@
 		{ name: 'joint_3', label: 'Joint 3' },
 		{ name: 'joint_4', label: 'Joint 4' },
 		{ name: 'joint_5', label: 'Joint 5' },
-		{ name: 'joint_6', label: 'Joint 6' }
+		{ name: 'joint_6', label: 'Joint 6' },
 	] as const satisfies Array<{ name: RobotJointName; label: string }>;
 
 	const DEFAULT_LIMIT: JointRange = { lower: -6.28, upper: 6.28 };
-
 	const splineBuilder = new SplineTrajectoryObjectBuilder({ pointSize: 0.03 });
 
 	let {
@@ -47,6 +47,7 @@
 	let currentTrajectoryValue = $state<EulerPose[]>([]);
 
 	let trajectoryObject: THREE.Group | undefined;
+    let gripperLimits: JointRange = {lower: 0, upper: 100};
 
 	function formatAngle(value: number) {
 		return `${value.toFixed(2)}`;
@@ -112,7 +113,7 @@
 				updated = true;
 			}
 		}
-
+ 
 		if (updated) {
 			jointLimits = nextLimits;
 		}
@@ -200,15 +201,28 @@
 						max={limits.upper}
 						step="0.01"
 						value={value}
-						aria-label={`${joint.label} angle`}
-						aria-valuemin={limits.lower}
-						aria-valuemax={limits.upper}
-						aria-valuenow={value}
 						oninput={(event) => setJointFromInput(joint.name, event)}
 					/>
 				{/if}
 			</div>
 		{/each}
+
+        <div class="slider-row">
+            <span class="slider-label">Gripper</span>
+            <span class="slider-value">{formatAngle($gripperValue)}</span>
+            {#if showJoints}
+                <input
+                    class="slider-input"
+                    type="range"
+                    min={gripperLimits?.lower}
+                    max={gripperLimits?.upper}
+                    step="0.01"
+                    value={$gripperValue}
+                    oninput={(event) => gripperValue.set(Number(event.currentTarget.value))}
+                />
+            {/if}
+        </div>
+
 	</div>
 </div>
 

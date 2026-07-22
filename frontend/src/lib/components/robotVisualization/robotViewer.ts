@@ -161,6 +161,21 @@ export class RobotViewer {
 		this.robot.setJointValues(values);
 	}
 
+    setGripperValue(value: number): boolean {
+        const jointName = 'gripper_r_joint1';
+        const limits = this.getJointLimits(jointName);
+        if (!limits) {
+            console.warn(`[RobotViewer] no such joint or missing limits: ${jointName}`);
+            return false;
+        }
+
+        const clamped = Math.min(100, Math.max(0, value));
+        const t = clamped / 100; // normalize 0-100 to 0-1
+        const angle = limits.lower + t * (limits.upper - limits.lower);
+
+        return this.setJointAngle(jointName, angle);
+    }
+
 	/**
 	 * Returns the world-space position of a named URDF frame after the current
 	 * joint values have been applied.

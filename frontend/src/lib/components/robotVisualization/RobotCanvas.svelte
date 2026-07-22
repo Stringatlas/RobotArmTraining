@@ -4,11 +4,8 @@
 	import {
 		robotJointValues,
 		toolheadPose,
-		setRobotJoint,
-		setRobotJoints,
+		gripperValue,
 	} from '$lib/state/robotState';
-
-    import type { RobotJointName } from '$lib/types';
 
     interface Props {
         urdfUrl: string;
@@ -36,6 +33,7 @@
 		joint_5: 0,
 		joint_6: 0
 	});
+	let latestGripperValue = $state(1);
 
 	function syncToolheadPose() {
 		const pose = viewer?.getToolheadCenterPose();
@@ -50,9 +48,15 @@
 	});
 
 	onMount(() => {
-		const unsubscribe = robotJointValues.subscribe((values) => {
+		const unsubscribeJoints = robotJointValues.subscribe((values) => {
 			latestJointValues = values;
 			viewer?.setJointAngles(values);
+			syncToolheadPose();
+		});
+
+		const unsubscribeGripper = gripperValue.subscribe((value) => {
+			latestGripperValue = value;
+			viewer?.setGripperValue(value);
 			syncToolheadPose();
 		});
 
@@ -62,6 +66,7 @@
 			.then(() => {
 				loaded = true;
 				viewer?.setJointAngles(latestJointValues);
+				viewer?.setGripperValue(latestGripperValue);
 				syncToolheadPose();
 			})
 			.catch((err) => {
@@ -70,53 +75,14 @@
 			});
 
 		return () => {
-			unsubscribe();
+			unsubscribeJoints();
+			unsubscribeGripper();
 		};
 	});
 
 	onDestroy(() => {
 		viewer?.dispose();
 	});
-
-	export function setJointAngle(jointName: string, value: number) {
-		if (!viewer?.setJointAngle(jointName, value)) return;
-		setRobotJoint(jointName as RobotJointName, value);
-		syncToolheadPose();
-	}
-
-	export function setJointAngles(values: Record<string, number>) {
-		viewer?.setJointAngles(values);
-		setRobotJoints(values as Partial<Record<RobotJointName, number>>);
-		syncToolheadPose();
-	}
-
-	export function setJoint1(value: number) {
-		setJointAngle('joint_1', value);
-	}
-
-	export function setJoint2(value: number) {
-		setJointAngle('joint_2', value);
-	}
-
-	export function setJoint3(value: number) {
-		setJointAngle('joint_3', value);
-	}
-
-	export function setJoint4(value: number) {
-		setJointAngle('joint_4', value);
-	}
-
-	export function setJoint5(value: number) {
-		setJointAngle('joint_5', value);
-	}
-
-	export function setJoint6(value: number) {
-		setJointAngle('joint_6', value);
-	}
-
-	export function getJointNames(): string[] {
-		return viewer?.getJointNames() ?? [];
-	}
 </script>
 
 <div class="robot-canvas-wrapper">

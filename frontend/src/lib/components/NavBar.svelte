@@ -1,6 +1,6 @@
 <script lang="ts">
 	type Status = 'checking' | 'ok' | 'down';
-    import { robotState } from '$lib/state/robotState';
+    import { robotMovementState, robotState } from '$lib/state/robotState';
 	let backendStatus = $state<Status>('checking');
     let robotStatus = $state<Status>('checking');
     
@@ -32,6 +32,7 @@
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
+
             let json = await response.json();
             $robotState = json.state;
         } catch (err) {
@@ -85,7 +86,7 @@
         {#if $robotState.toLowerCase() === 'executing'}
             <button onclick={emergencyStop}>Stop</button>
         {/if}
-        {#if $robotState.toLowerCase() === 'estop'}
+        {#if $robotMovementState.toLowerCase() === 'estop'}
             <button onclick={restart}>Restart</button>
         {/if}
 	</div>

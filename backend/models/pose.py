@@ -36,10 +36,30 @@ class TcpPose:
             "rz": self.rz,
         }
 
+@dataclass(frozen=True, slots=True)
+class GripperStatus:
+    force: float
+    amplitude: float
+    weight: float
+    hold_on: bool
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "GripperStatus":
+        return cls(force=d["force"], amplitude=d["amplitude"], weight=d["weight"], hold_on=d["hold_on"])
+    
+    def to_dict(self) -> dict:
+        return {
+            "force": self.force,
+            "amplitude": self.amplitude,
+            "weight": self.weight,
+            "hold_on": self.hold_on,
+        }
+
+
 
 @dataclass(frozen=True, slots=True)
 class TelemetrySample:
-    """One raw sample off the robot's /telemetry/ws, hardware/robot timestamped.
+    """One raw sample off the robot's /telemetry/ws/robot, hardware/robot timestamped.
 
     This is the raw, jittery-arrival form. Resampling onto a fixed-rate
     grid (later, in resampler.py) consumes a sequence of these — not
@@ -48,6 +68,7 @@ class TelemetrySample:
 
     joint_pos: list[float]
     tcp_pose: TcpPose
+    gripper_status: GripperStatus
     state: str
     ts: float  # seconds, as emitted by the robot service
 
@@ -56,6 +77,7 @@ class TelemetrySample:
         return cls(
             joint_pos=list(msg["joint_pos"]),
             tcp_pose=TcpPose.from_dict(msg["tcp_pose"]),
+            gripper_status=GripperStatus.from_dict(msg["gripper_status"]),
             state=msg["state"],
             ts=msg["ts"],
         )
@@ -64,6 +86,7 @@ class TelemetrySample:
         return {
             "joint_pos": self.joint_pos,
             "tcp_pose": self.tcp_pose.to_dict(),
+            "gripper_status": self.gripper_status.to_dict(),
             "state": self.state,
             "ts": self.ts,
         }

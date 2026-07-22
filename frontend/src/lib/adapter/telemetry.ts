@@ -1,8 +1,8 @@
 import { writable } from 'svelte/store';
-import { robotJointValues, toolheadPose, robotMovementState } from '$lib/state/robotState';
-import type { RobotJointValues, EulerPose as ToolheadPose } from '$lib/types'; 
+import { robotJointValues, toolheadPose, robotMovementState, gripperValue } from '$lib/state/robotState';
+import type { RobotJointValues } from '$lib/types'; 
 
-const WS_PATH = '/api/telemetry/ws';
+const ROBOT_WS_PATH = '/api/telemetry/ws/robot';
 const RECONNECT_DELAY_MS = 2000;
 const STALE_TIMEOUT_MS = 3000;
 
@@ -35,6 +35,7 @@ function toRobotJointValues(jointPos: number[]): RobotJointValues {
 interface TelemetryMessage {
 	joint_pos: number[];
 	tcp_pose: { x: number; y: number; z: number; rx: number; ry: number; rz: number };
+    gripper_status: { "force": number, "amplitude": number, "weight": number, "hold_on": boolean}
 	state: string;
 	ts: number;
 }
@@ -83,7 +84,7 @@ function connect(): void {
 	telemetryStatus.set('connecting');
 
 	const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-	const url = `${protocol}//${window.location.host}${WS_PATH}`;
+	const url = `${protocol}//${window.location.host}${ROBOT_WS_PATH}`;
 
 	socket = new WebSocket(url);
 
@@ -111,6 +112,7 @@ function connect(): void {
 			robotJointValues.set(toRobotJointValues(parsed.joint_pos));
 			toolheadPose.set(parsed.tcp_pose);
             robotMovementState.set(parsed.state);
+            gripperValue.set(parsed.gripper_status.amplitude ?? 0)
 			latestRobotState = parsed.state;
 			markMessageReceived();
 		} catch (err) {

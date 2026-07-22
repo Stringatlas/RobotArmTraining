@@ -74,7 +74,7 @@ def get_robot_client(request) -> RobotClient:
     return request.app.state.robot_client
 
 
-@router.websocket("/telemetry/ws")
+@router.websocket("/telemetry/ws/robot")
 async def telemetry_ws(websocket: WebSocket) -> None:
     await websocket.accept()
     await broadcaster.add_client(websocket)
@@ -90,3 +90,68 @@ async def telemetry_ws(websocket: WebSocket) -> None:
     finally:
         await broadcaster.remove_client(websocket)
         logger.info("Frontend telemetry client disconnected (%d total)", len(broadcaster._clients))
+
+
+# ---------------------------------------------------------------------------
+# Camera frame relay — robot's RGB-D stream → frontend (RGB JPEG only)
+# ---------------------------------------------------------------------------
+
+class CameraBroadcaster:
+    """Holds connected frontend WS clients and pushes camera frames to them.
+
+    Each frame is sent as a JSON text message with frame metadata, followed
+    by a binary message containing the RGB JPEG bytes.
+    """
+
+    def __init__(self):
+        self._clients: set[WebSocket] = set()
+        self._lock = asyncio.Lock()
+
+    async def add_client(self, ws: WebSocket) -> None:
+        async with self._lock:
+            self._clients.add(ws)
+
+    async def remove_client(self, ws: WebSocket) -> None:
+        async with self._lock:
+            self._clients.discard(ws)
+
+    async def on_frame(self, meta: dict, rgb_jpeg: bytes) -> None:
+        """Callback registered with CameraFrameClient.subscribe(); fired per frame."""
+        if not self._clients:
+            return
+
+        dead: list[WebSocket] = []
+
+        async with self._lock:
+            clients = list(self._clients)
+
+        for client in clients:
+            try:
+                await client.send_json(meta)
+                await client.send_bytes(rgb_jpeg)
+            except Exception:
+                dead.append(client)
+
+        if dead:
+            async with self._lock:
+                for client in dead:
+                    self._clients.discard(client)
+
+
+camera_broadcaster = CameraBroadcaster()
+
+
+@router.websocket("/telemetry/ws/camera")
+async def camera_ws(websocket: WebSocket) -> None:
+    await websocket.accept()
+    await camera_broadcaster.add_client(websocket)
+    logger.info("Camera client connected (%d total)", len(camera_broadcaster._clients))
+
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        pass
+    finally:
+        await camera_broadcaster.remove_client(websocket)
+        logger.info("Camera client disconnected (%d total)", len(camera_broadcaster._clients))

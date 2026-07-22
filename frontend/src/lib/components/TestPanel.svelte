@@ -45,7 +45,7 @@
                 waypoints: convertedTrajectory,
                 acc: 0.5,
                 vel: 0.5,
-                blend_radius: 0.05
+                blend_radius: 0.1
             })
         });
     }
@@ -55,6 +55,20 @@
             method: 'POST'
         });
     }
+
+    function setClaw(amplitude: number) {
+        fetch("/robot_api/set_claw", {
+            method: "POST",
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                "force": 0,
+                "amplitude": amplitude
+            })
+        })
+    }
+    
 </script>
 
 <div class="panel">
@@ -104,16 +118,24 @@
                 </div>
             </div>
         </div>
-        <button onclick={generateSpline}>Generate Spline</button>
-        <button onclick={followTrajectory}>Follow Trajectory</button>
+        <div class="button-row">
+            <button onclick={generateSpline}>Generate Spline</button>
+            <button onclick={followTrajectory}>Follow Trajectory</button>
+        </div>
         <button onclick={enableTeachMode}>Enable Teach Mode</button>
+        <div class="button-row">
+            <button onclick={() => setClaw(100)}>Open Claw</button>
+            <button onclick={() => setClaw(0)}>Close Claw</button>
+        </div>
     </section>
 
     <section class="section">
         <h2>Telemetry</h2>
         <p>Telemetry status: {$telemetryStatus}</p>
-        <button onclick={startTelemetry}>Sync Robot With Telemetry</button>
-        <button onclick={stopTelemetry}>Stop Robot Telemetry</button>
+        <div class="button-row">
+            <button onclick={startTelemetry}>Sync Robot With Telemetry</button>
+            <button onclick={stopTelemetry}>Stop Robot Telemetry</button>
+        </div>
     </section>
 </div>
 
@@ -198,6 +220,11 @@
 
     button:hover {
         background: #334155;
+    }
+
+    .button-row {
+        display: flex;
+        gap: 0.5rem;
     }
 
     .compact-pose {
