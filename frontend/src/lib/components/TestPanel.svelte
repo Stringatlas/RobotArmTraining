@@ -45,7 +45,7 @@
                 waypoints: convertedTrajectory,
                 acc: 0.5,
                 vel: 0.5,
-                blend_radius: 0.1
+                blend_radius: 0.2
             })
         });
     }

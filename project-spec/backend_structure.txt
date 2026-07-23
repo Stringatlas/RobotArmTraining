@@ -1,0 +1,40 @@
+backend/
+├── main.py                      # FastAPI app creation, router registration, startup/shutdown
+├── config.py                    # settings (robot service URL, target_hz, paths) via pydantic-settings
+│
+├── api/
+│   ├── routes_batch.py          # POST /batches, /batches/{id}/pause, /resume, /stop
+│   ├── routes_episode.py        # GET episode list/detail, PATCH relabel success/instruction
+│   ├── routes_export.py         # POST /export (bulk export filtered subset)
+│   ├── ws_telemetry.py          # WS endpoint: frontend <- live joint state, TCP pose, frames
+│   └── ws_control.py            # WS or REST for e-stop, manual jog (if you support it)
+│
+├── core/
+│   ├── state_machine.py         # idle -> executing -> capturing -> writing -> idle
+│   ├── episode_runner.py        # orchestrates one episode: detect -> plan -> execute -> capture -> write
+│   └── batch_manager.py         # loops episode_runner N times, persists batch progress to SQLite
+│
+├── services/
+│   ├── __init__.py               # empty, marks explicit package
+│   ├── robot_client.py          # thin async client for the robot's FastAPI: get_joint_angles, follow_trajectory, consumes /telemetry/ws
+│   ├── yolo_service.py          # loads model once at startup, runs inference on a frame -> pose/class/confidence
+│   ├── trajectory/
+│   │   ├── __init__.py           # empty
+│   │   ├── bezier.py              # CubicBezierCurve: vectorized position curve, evaluate/derivative/arc_length
+│   │   ├── arc_length.py          # ArcLengthLUT: arc-length -> t lookup for constant-velocity sampling along the curve
+│   │   └── trajectory.py          # generate_trajectory(): builds Bezier control points, slerps rotation, zips into Pose list
+│   ├── resampler.py             # raw buffer -> fixed-rate grid (interp for joints, Nth-frame for RGB-D)
+│   └── video_mux.py             # frames -> MP4 for replay scrubbing
+│
+├── storage/
+│   ├── hdf5_writer.py           # Episode dataclass -> HDF5 file per your schema
+│   ├── episode_repo.py          # SQLite CRUD for episodes table
+│   └── batch_repo.py            # SQLite CRUD for batches table
+│
+├── models/
+│   ├── pose.py                   # Pose dataclass (position, orientation) — shared across robot_client, trajectory, episode_runner
+│   ├── episode.py                # internal Episode dataclass/abstraction (buffer form, pre-HDF5)
+│   ├── schemas.py                # pydantic request/response models for API
+│   └── db_models.py              # SQLite table schema (raw SQL or SQLAlchemy core, no ORM needed for 2 tables)
+│
+└── db.py                         # SQLite connection/session setup

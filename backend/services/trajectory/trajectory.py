@@ -6,7 +6,6 @@ from services.trajectory.bezier import CubicBezierCurve
 from services.trajectory.equal_arc_length import ArcLengthLUT
 from models.robot import Pose
 
-
 from dataclasses import dataclass, field
 from numpy.typing import NDArray
 import numpy as np
@@ -21,7 +20,7 @@ class TrajectoryParams:
     approach_direction: NDArray[np.float64] = field(
         default_factory=lambda: np.array([0.0, 0.0, -1.0])
     )
-    n_waypoints: int = 3
+    n_waypoints: int = 5
     arc_length_samples: int = 200
 
 def _slerp(q0: np.ndarray, q1: np.ndarray, t: np.ndarray) -> np.ndarray:

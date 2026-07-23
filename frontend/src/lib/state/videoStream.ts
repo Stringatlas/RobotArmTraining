@@ -6,7 +6,6 @@ const RECONNECT_DELAY_MS = 2000;
 export type CameraStatus = 'disconnected' | 'connecting' | 'connected';
 export const cameraStatus = writable<CameraStatus>('disconnected');
 
-/** Latest frame as an object URL (blob:…). Subscribe to this to display the feed. */
 export const cameraFrameUrl = writable<string | null>(null);
 
 // --- Connection lifecycle ---------------------------------------------------
