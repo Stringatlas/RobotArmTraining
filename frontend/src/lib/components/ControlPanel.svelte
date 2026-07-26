@@ -10,6 +10,7 @@
 	} from '$lib/state/trainingState';
 
     import { robotState } from '$lib/state/robotState';
+    
 </script>
 
 <div class="panel">

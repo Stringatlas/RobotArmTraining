@@ -10,15 +10,13 @@ of truth (the robot connection) fanned out to N frontend consumers,
 rather than N frontend sockets each independently hitting the robot.
 """
 
-from __future__ import annotations
-
 import asyncio
 import logging
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from models.pose import TelemetrySample
-from services.robot_client import RobotClient
+from services.telemetry.robot_client import RobotClient
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

@@ -6,36 +6,27 @@
 
 </script>
 
-<div class="page-shell">
-	<div class="main-grid">
-		<div class="left-panel">
-			<TestPanel />
+<div class="main-grid">
+	<div class="left-panel">
+		<TestPanel />
+	</div>
+
+	<div class="right-panel">
+		<div class="scene-panel">
+			<Scene urdfUrl="/robot/urdf/lm3_with_gripper.urdf" workingPath="robot/meshes/" />
 		</div>
 
-		<div class="right-panel">
-			<div class="scene-panel">
-				<Scene urdfUrl="/robot/urdf/lm3_with_gripper.urdf" workingPath="robot/meshes/" />
-			</div>
-
-			<div class="stream-panel">
-				<WebStream />
-			</div>
+		<div class="stream-panel">
+			<WebStream />
 		</div>
 	</div>
 </div>
 
 <style>
-	.page-shell {
-		min-height: 100vh;
-		display: grid;
-		grid-template-rows: auto 1fr;
-		background: #0f172a;
-	}
-
-
 	.main-grid {
 		display: grid;
 		grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+		height: 100%;
 		min-height: 0;
 	}
 
@@ -50,11 +41,12 @@
 	.left-panel {
 		border-right: 1px solid #334155;
 		background: #0b1220;
+		overflow-y: auto;
 	}
 
 	.right-panel {
 		display: grid;
-		grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+		grid-template-rows: 1fr 1fr;
 		min-height: 0;
 	}
 
@@ -64,17 +56,7 @@
 	}
 
 	.stream-panel {
+		min-height: 0;
 		background: #111827;
-	}
-
-	:global(body) {
-		margin: 0;
-		min-height: 100vh;
-		background: #0f172a;
-	}
-
-	:global(html) {
-		min-height: 100vh;
-		background: #0f172a;
 	}
 </style>

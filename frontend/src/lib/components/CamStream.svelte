@@ -1,14 +1,22 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { cameraFrameUrl, cameraStatus, startCameraStream, stopCameraStream } from '$lib/state/videoStream';
 	import { detections, isDetecting, detectionError } from '$lib/state/detectionState';
 	import { runDetection } from '$lib/adapter/detection';
 
+	const IMG_W = 640;
+	const IMG_H = 480;
+
 	let canvas = $state<HTMLCanvasElement>();
 	let ctx = $state<CanvasRenderingContext2D | null>(null);
+	let imgEl = $state<HTMLImageElement>();
 
-	onMount(() => {
-		if (canvas) ctx = canvas.getContext('2d');
+	// Keep ctx in sync with the canvas element (handles {#if} block recreation)
+	$effect(() => {
+		if (canvas) {
+			ctx = canvas.getContext('2d');
+		} else {
+			ctx = null;
+		}
 	});
 
 	function toggleStream() {
@@ -23,33 +31,69 @@
 	$effect(() => {
 		if (ctx && $cameraFrameUrl && $detections.length > 0) {
 			drawOverlay();
-		} else if (ctx) {
-			ctx.clearRect(0, 0, 640, 480);
+		} else if (ctx && canvas) {
+			ctx.clearRect(0, 0, canvas.width, canvas.height);
 		}
 	});
 
+	// Redraw after the image actually finishes loading (handles async load timing)
+	function onImgLoad() {
+		if (ctx && $detections.length > 0) {
+			drawOverlay();
+		}
+	}
+
 	function drawOverlay() {
-		if (!ctx) return;
-		ctx.clearRect(0, 0, 640, 480);
+		if (!ctx || !canvas || !imgEl) return;
+
+		// Match canvas internal resolution to its displayed size
+		const displayW = canvas.clientWidth;
+		const displayH = canvas.clientHeight;
+		if (canvas.width !== displayW || canvas.height !== displayH) {
+			canvas.width = displayW;
+			canvas.height = displayH;
+		}
+
+		ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+		// Get the image's actual rendered rect within the page
+		const imgRect = imgEl.getBoundingClientRect();
+		const canvasRect = canvas.getBoundingClientRect();
+
+		// Offset of the image relative to the canvas (accounts for black bars)
+		const ox = imgRect.left - canvasRect.left;
+		const oy = imgRect.top - canvasRect.top;
+
+		// Uniform scale: use the smaller dimension ratio so we don't distort
+		const sx = imgRect.width / IMG_W;
+		const sy = imgRect.height / IMG_H;
 
 		for (const d of $detections) {
 			const { x1, y1, x2, y2 } = d.bbox;
 
+			// Scale and offset bounding box
+			const rx1 = x1 * sx + ox;
+			const ry1 = y1 * sy + oy;
+			const rw = (x2 - x1) * sx;
+			const rh = (y2 - y1) * sy;
+			const rcx = d.center_px.cx * sx + ox;
+			const rcy = d.center_px.cy * sy + oy;
+
 			// Bounding box
 			ctx.strokeStyle = '#00ff88';
 			ctx.lineWidth = 2;
-			ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+			ctx.strokeRect(rx1, ry1, rw, rh);
 
 			// Center dot
 			ctx.fillStyle = '#ff3333';
 			ctx.beginPath();
-			ctx.arc(d.center_px.cx, d.center_px.cy, 4, 0, 2 * Math.PI);
+			ctx.arc(rcx, rcy, 4, 0, 2 * Math.PI);
 			ctx.fill();
 
 			// Label
 			ctx.fillStyle = '#00ff88';
 			ctx.font = 'bold 13px monospace';
-			ctx.fillText(`${d.name} ${(d.confidence * 100).toFixed(0)}%`, x1 + 2, y1 - 6);
+			ctx.fillText(`${d.name} ${(d.confidence * 100).toFixed(0)}%`, rx1 + 2, ry1 - 6);
 		}
 	}
 
@@ -62,16 +106,14 @@
 	{#if $cameraFrameUrl}
 		<div class="frame-wrapper">
 			<img
+				bind:this={imgEl}
 				src={$cameraFrameUrl}
 				alt="Camera feed"
 				class="camera-feed"
-				width={640}
-				height={480}
+				onload={onImgLoad}
 			/>
 			<canvas
 				bind:this={canvas}
-				width={640}
-				height={480}
 				class="overlay-canvas"
 			></canvas>
 			<div class="controls">
@@ -115,12 +157,13 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
+		background: #000;
 	}
 
 	.camera-feed {
-		width: 100%;
-		height: 100%;
-		object-fit: contain;
+		max-width: 100%;
+		max-height: 100%;
+		aspect-ratio: 4 / 3;
 		display: block;
 	}
 

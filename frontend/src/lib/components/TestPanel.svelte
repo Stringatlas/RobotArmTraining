@@ -5,6 +5,8 @@
     import type { EulerPose } from "$lib/types";
     import { telemetryStatus, startTelemetry, stopTelemetry } from "$lib/adapter/telemetry";
     import { convertEulerToQuaternion, convertQuaternionToEuler } from "$lib/adapter/trajectory";
+    import { worldDetections, isWorldDetecting, worldDetectionError } from "$lib/state/detectionState";
+    import { runWorldDetection } from "$lib/adapter/detection";
 
     let roundedCurrentPose = $derived({
             x: $toolheadPose.x.toFixed(3),
@@ -137,6 +139,35 @@
             <button onclick={stopTelemetry}>Stop Robot Telemetry</button>
         </div>
     </section>
+
+    <section class="section">
+        <h2>World Frame Detections</h2>
+        <button onclick={runWorldDetection} disabled={$isWorldDetecting}>
+            {$isWorldDetecting ? 'Detecting…' : 'Detect World'}
+        </button>
+        {#if $worldDetectionError}
+            <div class="error-msg">{$worldDetectionError}</div>
+        {/if}
+        {#if $worldDetections.length > 0}
+            <div class="detection-list">
+                {#each $worldDetections as det, i}
+                    <div class="detection-card">
+                        <h3>{det.name} <span class="conf">{(det.confidence * 100).toFixed(0)}%</span></h3>
+                        <div class="coord-grid">
+                            <span class="label">Camera X</span><span class="value">{det.camera_xyz_m?.[0]?.toFixed(3) ?? '—'}</span>
+                            <span class="label">Camera Y</span><span class="value">{det.camera_xyz_m?.[1]?.toFixed(3) ?? '—'}</span>
+                            <span class="label">Camera Z</span><span class="value">{det.camera_xyz_m?.[2]?.toFixed(3) ?? '—'}</span>
+                            <span class="label">Base X</span><span class="value">{det.base_xyz_m?.[0]?.toFixed(3) ?? '—'}</span>
+                            <span class="label">Base Y</span><span class="value">{det.base_xyz_m?.[1]?.toFixed(3) ?? '—'}</span>
+                            <span class="label">Base Z</span><span class="value">{det.base_xyz_m?.[2]?.toFixed(3) ?? '—'}</span>
+                        </div>
+                    </div>
+                {/each}
+            </div>
+        {:else if !$isWorldDetecting}
+            <p class="no-dets">No detections yet</p>
+        {/if}
+    </section>
 </div>
 
 <style>
@@ -268,6 +299,43 @@
     input::-webkit-outer-spin-button,
     input::-webkit-inner-spin-button {
         -webkit-appearance: none;
+        margin: 0;
+    }
+
+    .detection-list {
+        display: grid;
+        gap: 0.5rem;
+    }
+
+    .detection-card {
+        display: grid;
+        gap: 0.4rem;
+        padding: 0.5rem;
+        border: 1px solid #334155;
+        background: #0f172a;
+    }
+
+    .detection-card h3 {
+        margin: 0;
+        font-size: 0.9rem;
+        font-weight: 600;
+    }
+
+    .conf {
+        color: #60a5fa;
+        font-weight: 500;
+    }
+
+    .coord-grid {
+        display: grid;
+        grid-template-columns: auto auto;
+        gap: 0.25rem 1rem;
+        align-items: center;
+    }
+
+    .no-dets {
+        color: #64748b;
+        font-size: 0.85rem;
         margin: 0;
     }
 </style>

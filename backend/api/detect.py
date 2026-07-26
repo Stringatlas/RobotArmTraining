@@ -1,23 +1,28 @@
 """
-POST /detect          — YOLO detections with camera-relative 3D coordinates
-POST /detect/world    — YOLO detections with robot-base-frame 3D coordinates
+POST /api/detect          — Zero-shot detections with camera-relative 3D coordinates
+POST /api/detect/world    — Zero-shot detections with robot-base-frame 3D coordinates
 
 Pipeline:
   1. Fetches a frame (RGB + depth + intrinsics) from the robot service
-  2. Sends the RGB JPEG to the remote YOLO server for object detection
+  2. Runs Grounding DINO zero-shot detection locally on the BGR image
   3. For each detection, computes the 3D camera-relative point using
      depth backprojection
   4. (world variant only) Applies the T_base_camera hand-eye calibration
      to transform camera-relative → robot-base-frame coordinates
 """
+from __future__ import annotations
+
 import base64
 import logging
+from typing import Any
 
+import cv2
+import numpy as np
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from config import settings
+from services.object_detection.detector import detector as dino_detector
 from services.object_detection.yolo_service import (
-    detect_on_frame,
     backproject_to_camera,
     median_depth_at,
 )
@@ -26,6 +31,14 @@ from services.object_detection.calibration import camera_to_base_point
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/detect", tags=["detect"])
+
+# Prompt used for zero-shot detection. Can be changed at runtime.
+_current_prompt: str = "coke can"
+
+
+def set_prompt(prompt: str) -> None:
+    global _current_prompt
+    _current_prompt = prompt
 
 
 class Detection3D(BaseModel):
@@ -55,10 +68,14 @@ class DetectWorldResponse(BaseModel):
     n_detections: int
 
 
-async def _run_detection_pipeline() -> tuple[list[dict], dict, str]:
-    """Shared pipeline: fetch frame → YOLO detect.
+class SetPromptRequest(BaseModel):
+    prompt: str = Field(..., description="Zero-shot detection prompt, e.g. 'bottle' or 'rubber duck'")
 
-    Returns (raw_detections, camera_info, depth_b64).
+
+async def _fetch_frame() -> tuple[np.ndarray, str, dict[str, Any]]:
+    """Fetch a frame from the robot service.
+
+    Returns (bgr_image, depth_b64, camera_info).
     Raises HTTPException on failure.
     """
     import httpx
@@ -76,18 +93,26 @@ async def _run_detection_pipeline() -> tuple[list[dict], dict, str]:
 
     rgb_b64: str | None = frame_pkg.get("rgb_jpeg_base64")
     depth_b64: str | None = frame_pkg.get("depth_png16_base64")
-    camera_info: dict | None = frame_pkg.get("camera_info")
+    camera_info: dict[str, Any] | None = frame_pkg.get("camera_info")
 
     if not rgb_b64 or not depth_b64 or not camera_info:
         raise HTTPException(503, "Incomplete frame data from robot service")
 
+    # Decode RGB JPEG back to BGR numpy array for the local detector
     rgb_jpeg_bytes = base64.b64decode(rgb_b64)
-    raw_detections = await detect_on_frame(rgb_jpeg_bytes)
-    return raw_detections, camera_info, depth_b64
+    nparr = np.frombuffer(rgb_jpeg_bytes, np.uint8)
+    bgr_image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    if bgr_image is None:
+        raise HTTPException(503, "Failed to decode RGB JPEG frame")
+
+    return bgr_image, depth_b64, camera_info
 
 
 def _compute_camera_xyz(
-    det: dict, camera_info: dict, depth_b64: str, depth_scale: float
+    det: dict[str, Any],
+    camera_info: dict[str, Any],
+    depth_b64: str,
+    depth_scale: float,
 ) -> tuple[float | None, list[float] | None]:
     """Compute depth_m and camera_xyz for a single detection."""
     cx, cy = det["cx"], det["cy"]
@@ -98,18 +123,29 @@ def _compute_camera_xyz(
     return depth_m, camera_xyz
 
 
+@router.post("/prompt")
+async def set_detect_prompt(req: SetPromptRequest):
+    """Change the zero-shot detection prompt at runtime."""
+    set_prompt(req.prompt)
+    logger.info("Detection prompt changed to: %s", req.prompt)
+    return {"ok": True, "prompt": req.prompt}
+
+
 @router.post("", response_model=DetectResponse)
 async def detect():
-    """YOLO detections with camera-relative 3D coordinates.
+    """Run Grounding DINO detection with camera-relative 3D coordinates.
 
-    Returns all detected objects with their 3D position in the camera
-    coordinate frame.  Use POST /detect/world to get robot-base-frame
-    coordinates instead.
+    Uses the current prompt (set via POST /detect/prompt, defaults to 'object').
     """
-    raw_detections, camera_info, depth_b64 = await _run_detection_pipeline()
+    bgr_image, depth_b64, camera_info = await _fetch_frame()
     depth_scale = float(camera_info["depth_scale"])
-    results: list[Detection3D] = []
 
+    # Run local detection
+    raw_detections = dino_detector.detect(bgr_image, prompt=_current_prompt)
+    if not raw_detections:
+        return DetectResponse(detections=[], n_detections=0)
+
+    results: list[Detection3D] = []
     for det in raw_detections:
         depth_m, camera_xyz = _compute_camera_xyz(det, camera_info, depth_b64, depth_scale)
         results.append(Detection3D(
@@ -126,19 +162,20 @@ async def detect():
 
 @router.post("/world", response_model=DetectWorldResponse)
 async def detect_world():
-    """YOLO detections with robot-base-frame 3D coordinates.
+    """Run Grounding DINO detection with robot-base-frame 3D coordinates.
 
     Same as POST /detect but additionally transforms each detection's
     camera-relative 3D point into the robot base frame using the
     T_base_camera hand-eye calibration matrix.
-
-    Returns all detected objects with both camera-relative and
-    base-frame 3D coordinates.
     """
-    raw_detections, camera_info, depth_b64 = await _run_detection_pipeline()
+    bgr_image, depth_b64, camera_info = await _fetch_frame()
     depth_scale = float(camera_info["depth_scale"])
-    results: list[DetectionWorld] = []
 
+    raw_detections = dino_detector.detect(bgr_image, prompt=_current_prompt)
+    if not raw_detections:
+        return DetectWorldResponse(detections=[], n_detections=0)
+
+    results: list[DetectionWorld] = []
     for det in raw_detections:
         depth_m, camera_xyz = _compute_camera_xyz(det, camera_info, depth_b64, depth_scale)
 

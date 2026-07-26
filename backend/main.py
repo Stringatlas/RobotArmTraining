@@ -1,12 +1,16 @@
+import logging
+
 from fastapi import FastAPI, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from api.trajectory import router as trajectory_router
 from api.detect import router as detect_router
-from api.yolo_server import router as yolo_server_router
 from api.ws_telemetry import broadcaster, camera_broadcaster, router as telemetry_router
 from services.telemetry.robot_client import RobotClient
 from services.telemetry.camera_client import CameraFrameClient
+from services.object_detection.detector import detector as dino_detector
 from config import settings
+
+logger = logging.getLogger(__name__)
 
 app  = FastAPI()
 api = APIRouter(prefix="/api")
@@ -24,6 +28,11 @@ def health():
 
 @app.on_event("startup")
 async def startup():
+    # Load Grounding DINO model (local zero-shot detection)
+    logger.info("Loading Grounding DINO model...")
+    dino_detector.load()
+    logger.info("Grounding DINO model loaded.")
+
     # Robot telemetry (joints, pose, gripper)
     app.state.robot_client = RobotClient(settings.robot_telemetry_url)
     app.state.robot_client.subscribe(broadcaster.on_sample)
@@ -43,7 +52,3 @@ api.include_router(trajectory_router)
 api.include_router(detect_router)
 api.include_router(telemetry_router)
 app.include_router(api)
-
-# YOLO server endpoints (GET /image, POST /detections) — registered directly
-# on app, NOT under /api, so the remote detection server can reach them.
-app.include_router(yolo_server_router)

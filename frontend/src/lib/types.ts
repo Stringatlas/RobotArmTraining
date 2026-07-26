@@ -18,3 +18,7 @@ export interface Detection3D {
 	depth_m: number | null;
 	camera_xyz_m: [number, number, number] | null;
 }
+
+export interface DetectionWorld extends Detection3D {
+	base_xyz_m: [number, number, number] | null;
+}
