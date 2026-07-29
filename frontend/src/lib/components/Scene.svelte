@@ -1,17 +1,20 @@
 <script lang="ts">
-	import * as THREE from 'three';
-	import { onDestroy, onMount } from 'svelte';
-	import RobotCanvas from './robotVisualization/RobotCanvas.svelte';
-	import { RobotViewer } from './robotVisualization/robotViewer';
-	import { SplineTrajectoryObjectBuilder } from './splineVisualization/splineViewer';
-	import { currentTrajectory } from '$lib/state/trajectoryState';
+	import * as THREE from "three";
+	import { onDestroy, onMount } from "svelte";
+	import RobotCanvas from "./robotVisualization/RobotCanvas.svelte";
+	import { RobotViewer } from "./robotVisualization/robotViewer";
+	import { SplineTrajectoryObjectBuilder } from "./splineVisualization/splineViewer";
+	import { currentTrajectory } from "$lib/state/trajectoryState";
 	import {
 		initialRobotJointValues,
 		robotJointValues,
 		setRobotJoint,
-        gripperValue,
-	} from '$lib/state/robotState';
-	import type { EulerPose, RobotJointName } from '$lib/types';
+		setRobotJoints,
+		gripperValue,
+		toolheadPose,
+		targetTCPPosition,
+	} from "$lib/state/robotState";
+	import type { EulerPose, RobotJointName } from "$lib/types";
 
 	interface Props {
 		urdfUrl: string;
@@ -22,32 +25,34 @@
 	type JointRange = { lower: number; upper: number };
 
 	const JOINTS = [
-		{ name: 'joint_1', label: 'Joint 1' },
-		{ name: 'joint_2', label: 'Joint 2' },
-		{ name: 'joint_3', label: 'Joint 3' },
-		{ name: 'joint_4', label: 'Joint 4' },
-		{ name: 'joint_5', label: 'Joint 5' },
-		{ name: 'joint_6', label: 'Joint 6' },
+		{ name: "joint_1", label: "Joint 1" },
+		{ name: "joint_2", label: "Joint 2" },
+		{ name: "joint_3", label: "Joint 3" },
+		{ name: "joint_4", label: "Joint 4" },
+		{ name: "joint_5", label: "Joint 5" },
+		{ name: "joint_6", label: "Joint 6" },
 	] as const satisfies Array<{ name: RobotJointName; label: string }>;
 
 	const DEFAULT_LIMIT: JointRange = { lower: -6.28, upper: 6.28 };
-	const splineBuilder = new SplineTrajectoryObjectBuilder({ pointSize: 0.03 });
+	const splineBuilder = new SplineTrajectoryObjectBuilder({
+		pointSize: 0.03,
+	});
 
-	let {
-		urdfUrl,
-		workingPath,
-		backgroundColor = undefined
-	}: Props = $props();
+	let { urdfUrl, workingPath, backgroundColor = undefined }: Props = $props();
 
 	let viewer = $state<RobotViewer | undefined>(undefined);
 	let jointValues = $state({ ...initialRobotJointValues });
 	let jointLimits = $state<Partial<Record<RobotJointName, JointRange>>>({});
 	let showTrajectory = $state(true);
 	let showJoints = $state(false);
+	let showIK = $state(false);
+	let ikX = $state(0);
+	let ikY = $state(0);
+	let ikZ = $state(0);
 	let currentTrajectoryValue = $state<EulerPose[]>([]);
 
 	let trajectoryObject: THREE.Group | undefined;
-    let gripperLimits: JointRange = {lower: 0, upper: 100};
+	let gripperLimits: JointRange = { lower: 0, upper: 100 };
 
 	function formatAngle(value: number) {
 		return `${value.toFixed(2)}`;
@@ -61,6 +66,24 @@
 		const input = event.currentTarget as HTMLInputElement;
 		const value = Number(input.value);
 		setRobotJoint(name, value);
+	}
+
+	/** Called whenever showIK is toggled on — seeds the IK target from the current TCP pose. */
+	function enableIK() {
+		const pose = $toolheadPose;
+		ikX = +pose.x.toFixed(4);
+		ikY = +pose.y.toFixed(4);
+		ikZ = +pose.z.toFixed(4);
+		targetTCPPosition.set({ x: ikX, y: ikY, z: ikZ });
+	}
+
+	function disableIK() {
+		targetTCPPosition.set(null);
+		viewer?.setIKTargetMarker(null);
+	}
+
+	function onIKCoordInput() {
+		if (showIK) targetTCPPosition.set({ x: ikX, y: ikY, z: ikZ });
 	}
 
 	function disposeObject(object: THREE.Object3D) {
@@ -98,7 +121,9 @@
 
 		let updated = false;
 		let ready = true;
-		const nextLimits: Partial<Record<RobotJointName, JointRange>> = { ...jointLimits };
+		const nextLimits: Partial<Record<RobotJointName, JointRange>> = {
+			...jointLimits,
+		};
 
 		for (const joint of JOINTS) {
 			const limits = viewer.getJointLimits(joint.name);
@@ -108,12 +133,19 @@
 			}
 
 			const current = nextLimits[joint.name];
-			if (!current || current.lower !== limits.lower || current.upper !== limits.upper) {
-				nextLimits[joint.name] = { lower: limits.lower, upper: limits.upper };
+			if (
+				!current ||
+				current.lower !== limits.lower ||
+				current.upper !== limits.upper
+			) {
+				nextLimits[joint.name] = {
+					lower: limits.lower,
+					upper: limits.upper,
+				};
 				updated = true;
 			}
 		}
- 
+
 		if (updated) {
 			jointLimits = nextLimits;
 		}
@@ -127,6 +159,18 @@
 		});
 
 		return unsubscribe;
+	});
+
+	// Reactive IK solve: runs whenever targetTCPPosition changes (set externally or via inputs)
+	$effect(() => {
+		const target = $targetTCPPosition;
+		if (!viewer || !target) return;
+
+		const v3 = new THREE.Vector3(target.x, target.y, target.z);
+		viewer.setIKTargetMarker(v3);
+
+		const solved = viewer.solveIK(v3);
+		if (solved) setRobotJoints(solved);
 	});
 
 	$effect(() => {
@@ -169,23 +213,85 @@
 <div class="scene-shell">
 	<RobotCanvas
 		bind:viewer_={viewer}
-		urdfUrl={urdfUrl}
-		workingPath={workingPath}
-		backgroundColor={backgroundColor}
+		{urdfUrl}
+		{workingPath}
+		{backgroundColor}
 	/>
 
 	<div class="slider-overlay" aria-label="Scene controls">
 		<div class="toggle-row">
 			<label class="toggle-row">
-				<input bind:checked={showTrajectory} type="checkbox" aria-label="Show trajectory" />
+				<input
+					bind:checked={showTrajectory}
+					type="checkbox"
+					aria-label="Show trajectory"
+				/>
 				<span>Trajectory</span>
 			</label>
 
 			<label class="toggle-row">
-				<input bind:checked={showJoints} type="checkbox" aria-label="Show joints" />
+				<input
+					bind:checked={showJoints}
+					type="checkbox"
+					aria-label="Show joints"
+				/>
 				<span>Joints</span>
 			</label>
+
+			<label class="toggle-row">
+				<input
+					type="checkbox"
+					bind:checked={showIK}
+					aria-label="IK mode"
+					onchange={() => (showIK ? enableIK() : disableIK())}
+				/>
+				<span>IK Mode</span>
+			</label>
 		</div>
+
+		{#if showIK}
+			<div class="ik-inputs" aria-label="IK target position">
+				<div class="ik-row">
+					<span class="ik-label">X</span>
+					<input
+						id="ik-target-x"
+						class="ik-input"
+						type="number"
+						step="0.005"
+						bind:value={ikX}
+						oninput={onIKCoordInput}
+						aria-label="IK target X metres"
+					/>
+					<span class="ik-unit">m</span>
+				</div>
+				<div class="ik-row">
+					<span class="ik-label">Y</span>
+					<input
+						id="ik-target-y"
+						class="ik-input"
+						type="number"
+						step="0.005"
+						bind:value={ikY}
+						oninput={onIKCoordInput}
+						aria-label="IK target Y metres"
+					/>
+					<span class="ik-unit">m</span>
+				</div>
+				<div class="ik-row">
+					<span class="ik-label">Z</span>
+					<input
+						id="ik-target-z"
+						class="ik-input"
+						type="number"
+						step="0.005"
+						bind:value={ikZ}
+						oninput={onIKCoordInput}
+						aria-label="IK target Z metres"
+					/>
+					<span class="ik-unit">m</span>
+				</div>
+			</div>
+		{/if}
 
 		{#each JOINTS as joint}
 			{@const limits = getLimits(joint.name)}
@@ -200,29 +306,30 @@
 						min={limits.lower}
 						max={limits.upper}
 						step="0.01"
-						value={value}
-						oninput={(event) => setJointFromInput(joint.name, event)}
+						{value}
+						oninput={(event) =>
+							setJointFromInput(joint.name, event)}
 					/>
 				{/if}
 			</div>
 		{/each}
 
-        <div class="slider-row">
-            <span class="slider-label">Gripper</span>
-            <span class="slider-value">{formatAngle($gripperValue)}</span>
-            {#if showJoints}
-                <input
-                    class="slider-input"
-                    type="range"
-                    min={gripperLimits?.lower}
-                    max={gripperLimits?.upper}
-                    step="0.01"
-                    value={$gripperValue}
-                    oninput={(event) => gripperValue.set(Number(event.currentTarget.value))}
-                />
-            {/if}
-        </div>
-
+		<div class="slider-row">
+			<span class="slider-label">Gripper</span>
+			<span class="slider-value">{formatAngle($gripperValue)}</span>
+			{#if showJoints}
+				<input
+					class="slider-input"
+					type="range"
+					min={gripperLimits?.lower}
+					max={gripperLimits?.upper}
+					step="0.01"
+					value={$gripperValue}
+					oninput={(event) =>
+						gripperValue.set(Number(event.currentTarget.value))}
+				/>
+			{/if}
+		</div>
 	</div>
 </div>
 
@@ -249,7 +356,7 @@
 		left: 1rem;
 		bottom: 1rem;
 		width: fit-content;
-        height: fit-content;
+		height: fit-content;
 		display: flex;
 		flex-direction: column;
 		gap: 0.75rem;
@@ -304,6 +411,36 @@
 	.slider-input:focus-visible {
 		outline: 2px solid rgba(122, 205, 255, 0.65);
 		outline-offset: 3px;
+	}
+
+	.ik-inputs {
+		display: flex;
+		flex-direction: column;
+		gap: 0.45rem;
+	}
+
+	.ik-row {
+		display: grid;
+		grid-template-columns: 4rem 3rem minmax(0, 1fr);
+		align-items: center;
+		gap: 0.75rem;
+	}
+
+	.ik-label,
+	.ik-unit {
+		font-size: 0.92rem;
+		color: #eef4ff;
+	}
+
+	.ik-input {
+		width: min(100%, 5rem);
+		min-width: 0;
+		background: transparent;
+		border: 1px solid rgba(238, 244, 255, 0.2);
+		border-radius: 4px;
+		color: #eef4ff;
+		font-size: 0.92rem;
+		padding: 0.1rem 0.25rem;
 	}
 
 	@media (max-width: 1080px) {

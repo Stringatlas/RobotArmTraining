@@ -3,6 +3,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 import { ColladaLoader } from 'three/examples/jsm/loaders/ColladaLoader.js';
 import URDFLoader, { type URDFRobot } from 'urdf-loader';
+import { solveCCDIK } from './ikSolver';
 
 export interface RobotViewerOptions {
 	urdfUrl: string;
@@ -19,6 +20,7 @@ export class RobotViewer {
 	private renderer: THREE.WebGLRenderer;
 	private controls: OrbitControls;
 	private tcpMarker: THREE.Mesh;
+	private ikTargetMarker: THREE.Mesh;
 
 	private robot: URDFRobot | null = null;
 	private resizeObserver: ResizeObserver;
@@ -57,6 +59,8 @@ export class RobotViewer {
         this.setupGround();
 		this.tcpMarker = this.createTcpMarker();
 		this.scene.add(this.tcpMarker);
+		this.ikTargetMarker = this.createIKTargetMarker();
+		this.scene.add(this.ikTargetMarker);
 
         this.resizeObserver = new ResizeObserver(() => this.handleResize());
         this.resizeObserver.observe(canvas);
@@ -207,6 +211,53 @@ export class RobotViewer {
 		marker.visible = false;
 		marker.renderOrder = 999;
 		return marker;
+	}
+
+	private createIKTargetMarker(): THREE.Mesh {
+		const geometry = new THREE.SphereGeometry(0.025, 24, 16);
+		const material = new THREE.MeshBasicMaterial({
+			color: 0x00e5ff,
+			transparent: true,
+			opacity: 0.85
+		});
+		const marker = new THREE.Mesh(geometry, material);
+		marker.visible = false;
+		marker.renderOrder = 998;
+		return marker;
+	}
+
+	/**
+	 * Show or hide the cyan IK target sphere.
+	 * Pass null to hide it.
+	 */
+	setIKTargetMarker(position: THREE.Vector3 | null): void {
+		if (position) {
+			this.ikTargetMarker.position.copy(position);
+			this.ikTargetMarker.visible = true;
+		} else {
+			this.ikTargetMarker.visible = false;
+		}
+	}
+
+	/**
+	 * Run the CCD IK solver toward a world-space target position.
+	 * Only the 6 arm joints are solved; gripper joints are excluded.
+	 * Returns the solved joint angles, or null if the robot is not loaded.
+	 */
+	solveIK(target: THREE.Vector3, iterations = 15): Record<string, number> | null {
+		if (!this.robot) return null;
+
+		// Exclude gripper joints — only solve the 6 arm joints
+		const jointNames = this.getJointNames().filter(
+			(name) => !name.toLowerCase().includes('gripper')
+		);
+
+		const tcpFrame =
+			this.robot.getFrame('gripper_tip') ??
+			this.robot.getFrame('tool0');
+		if (!tcpFrame) return null;
+
+		return solveCCDIK(this.robot, jointNames, tcpFrame, target, iterations);
 	}
 
 	private updateTcpMarker() {

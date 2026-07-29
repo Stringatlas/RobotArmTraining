@@ -2,7 +2,7 @@
     import { toolheadPose } from "$lib/state/robotState";
     import { currentTrajectory } from "$lib/state/trajectoryState";
     import { requestTrajectory } from "$lib/adapter/trajectory"
-    import type { EulerPose } from "$lib/types";
+    import type { EulerPose, DetectionWorld } from "$lib/types";
     import { telemetryStatus, startTelemetry, stopTelemetry } from "$lib/adapter/telemetry";
     import { convertEulerToQuaternion, convertQuaternionToEuler } from "$lib/adapter/trajectory";
     import { worldDetections, isWorldDetecting, worldDetectionError } from "$lib/state/detectionState";
@@ -20,6 +20,7 @@
 
     let startPose = $state({ x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 });
     let endPose = $state({ x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 });
+    let targetPose = $state({ x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 });
 
     function recordStart() {
         startPose = $toolheadPose;
@@ -34,6 +35,35 @@
         let end: EulerPose = endPose;
         await requestTrajectory(start, end);
     }
+
+    function goToPose() {
+        fetch('/robot_api/go_to_pose', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                x: targetPose.x,
+                y: targetPose.y,
+                z: targetPose.z,
+                rx: targetPose.rx,
+                ry: targetPose.ry,
+                rz: targetPose.rz,
+                acc: 0.5,
+                vel: 0.5
+            })
+        });
+    }
+
+    function goToStartPose() {
+        fetch('/robot_api/go_to_start_pose', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+    }
+
 
     // TODO: TEMPORARY, SHOULD CALL BACKEND INSTEAD OF ROBOT
     function followTrajectory() {
@@ -70,7 +100,21 @@
             })
         })
     }
-    
+
+    const PICKUP_OFFSET_Y = 0.066; // meters (standard soda can diameter)
+
+    function setEndPoseFromDetection(det: DetectionWorld) {
+        if (!det.base_xyz_m) return;
+        const [bx, by, bz] = det.base_xyz_m;
+        endPose = {
+            x: bx,
+            y: by + PICKUP_OFFSET_Y,
+            z: bz,
+            rx: 1.571,
+            ry: 0,
+            rz: -3.14
+        };
+    }
 </script>
 
 <div class="panel">
@@ -161,12 +205,31 @@
                             <span class="label">Base Y</span><span class="value">{det.base_xyz_m?.[1]?.toFixed(3) ?? '—'}</span>
                             <span class="label">Base Z</span><span class="value">{det.base_xyz_m?.[2]?.toFixed(3) ?? '—'}</span>
                         </div>
+                        <button onclick={() => setEndPoseFromDetection(det)}>Set as endPose</button>
                     </div>
                 {/each}
             </div>
         {:else if !$isWorldDetecting}
             <p class="no-dets">No detections yet</p>
         {/if}
+
+        <div class="pose-card">
+            <h3>Start Pose</h3>
+            <div class="button-row">
+                <button onclick={goToPose}>Go To Pose</button>
+                <button onclick={goToStartPose}>Go To Start Pose</button>
+            </div>
+
+            <div class="compact-pose">
+                <h4>Target Pose</h4>
+                <label>X <input type="number" bind:value={targetPose.x} step="0.01" /></label>
+                <label>Y <input type="number" bind:value={targetPose.y} step="0.01" /></label>
+                <label>Z <input type="number" bind:value={targetPose.z} step="0.01" /></label>
+                <label>RX <input type="number" bind:value={targetPose.rx} step="0.01" /></label>
+                <label>RY <input type="number" bind:value={targetPose.ry} step="0.01" /></label>
+                <label>RZ <input type="number" bind:value={targetPose.rz} step="0.01" /></label>
+            </div>
+        </div>
     </section>
 </div>
 
@@ -296,6 +359,7 @@
         outline: 2px solid #60a5fa;
         outline-offset: 1px;
     }
+
     input::-webkit-outer-spin-button,
     input::-webkit-inner-spin-button {
         -webkit-appearance: none;
