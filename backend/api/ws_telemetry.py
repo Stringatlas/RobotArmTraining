@@ -113,7 +113,7 @@ class CameraBroadcaster:
         async with self._lock:
             self._clients.discard(ws)
 
-    async def on_frame(self, meta: dict, rgb_jpeg: bytes) -> None:
+    async def on_frame(self, meta: dict, rgb_jpeg: bytes, depth_png16: bytes) -> None:
         """Callback registered with CameraFrameClient.subscribe(); fired per frame."""
         if not self._clients:
             return

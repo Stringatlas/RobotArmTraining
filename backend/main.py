@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.trajectory import router as trajectory_router
 from api.detect import router as detect_router
 from api.ws_telemetry import broadcaster, camera_broadcaster, router as telemetry_router
+from api.episode_recorder import router as episode_recorder_router
 from services.telemetry.robot_client import RobotClient
 from services.telemetry.camera_client import CameraFrameClient
 from services.object_detection.detector import detector as dino_detector
@@ -51,4 +52,5 @@ async def shutdown():
 api.include_router(trajectory_router)
 api.include_router(detect_router)
 api.include_router(telemetry_router)
+api.include_router(episode_recorder_router)
 app.include_router(api)

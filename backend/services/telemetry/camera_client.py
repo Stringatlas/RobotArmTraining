@@ -23,14 +23,14 @@ from websockets.exceptions import ConnectionClosed
 
 logger = logging.getLogger(__name__)
 
-FrameCallback = Callable[[dict, bytes], Awaitable[None]]
+FrameCallback = Callable[[dict, bytes, bytes], Awaitable[None]]
 
 
 class CameraFrameClient:
     """Owns the single connection to the robot's RGB-D frame stream.
     
-    Decodes each 3-part frame, discards depth, and forwards
-    (frame_meta_dict, rgb_jpeg_bytes) to subscribed callbacks.
+    Decodes each 3-part frame and forwards
+    (frame_meta_dict, rgb_jpeg_bytes, depth_png16_bytes) to subscribed callbacks.
     """
 
     def __init__(
@@ -114,13 +114,13 @@ class CameraFrameClient:
                         logger.warning("Connection closed mid-frame")
                         break
 
-                    if isinstance(rgb_jpeg, bytes):
-                        await self._dispatch(meta, rgb_jpeg)
+                    if isinstance(rgb_jpeg, bytes) and isinstance(_depth_png16, bytes):
+                        await self._dispatch(meta, rgb_jpeg, _depth_png16)
                 # If raw is binary, it means we're mid-frame — skip (protocol mismatch)
 
-    async def _dispatch(self, meta: dict, rgb_jpeg: bytes) -> None:
+    async def _dispatch(self, meta: dict, rgb_jpeg: bytes, depth_png16: bytes) -> None:
         for callback in list(self._callbacks):
             try:
-                await callback(meta, rgb_jpeg)
+                await callback(meta, rgb_jpeg, depth_png16)
             except Exception:
                 logger.exception("Camera frame subscriber callback raised")

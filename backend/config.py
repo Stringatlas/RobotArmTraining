@@ -16,4 +16,12 @@ class Settings:
         "services", "object_detection", "T_base_camera.npy",
     )
 
-settings = Settings();
+    # Storage settings
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    data_dir = os.path.join(base_dir, "data")
+    hdf5_dir = os.path.join(data_dir, "episodes")
+    sqlite_db_path = os.path.join(data_dir, "metadata.db")
+    default_target_hz = 30.0
+
+settings = Settings()
+

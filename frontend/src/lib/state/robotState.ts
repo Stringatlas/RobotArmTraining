@@ -12,6 +12,9 @@ export const initialRobotJointValues: RobotJointValues = {
 
 export const robotJointValues = writable<RobotJointValues>({ ...initialRobotJointValues });
 export const toolheadPose = writable<ToolheadPose>({x: 0, y: 0, z: 0, rx: 0, ry: 0,rz: 0});
+
+/** IK target position in world space (metres). null = IK mode disabled. */
+export const targetTCPPosition = writable<{ x: number; y: number; z: number } | null>(null);
 export const gripperValue = writable<number>(0) // 0-100
 
 export function setRobotJoint(name: RobotJointName, value: number) {

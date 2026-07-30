@@ -1,16 +1,41 @@
 <script lang="ts">
 	import {
-		batchSize,
-		batchSeed,
+		languageInstruction,
 		currentBatchID,
 		currentEpisodeIndex,
 		objectClass,
-		pollingInterval,
 		trainingState
 	} from '$lib/state/trainingState';
 
     import { robotState } from '$lib/state/robotState';
-    
+    import {
+        recordingStatus,
+        recordingElapsed,
+        currentEpisodeId,
+        startRecording,
+        stopRecording
+    } from '$lib/adapter/recording';
+
+    let errorMsg = $state("");
+
+    async function handleStart() {
+        errorMsg = '';
+        try {
+            await startRecording($currentBatchID, $objectClass, $languageInstruction);
+        } catch (e) {
+            errorMsg = String(e);
+        }
+    }
+
+    async function handleStop() {
+        errorMsg = '';
+        try {
+            const result = await stopRecording();
+            console.log('Recording saved:', result);
+        } catch (e) {
+            errorMsg = String(e);
+        }
+    }
 </script>
 
 <div class="panel">
@@ -23,23 +48,40 @@
 		</label>
 
 		<label>
-			<span>Batch Size</span>
-			<input type="number" min="0" bind:value={$batchSize} />
+			<span>Language instruction</span>
+			<input type="text" min="0" bind:value={$languageInstruction} />
 		</label>
 
 		<label>
 			<span>Object</span>
 			<input type="text" bind:value={$objectClass} />
 		</label>
+	</section>
+
+	<section class="section">
+		<h2>Recording</h2>
+
+		{#if $recordingStatus === 'idle'}
+			<button class="rec-btn start" onclick={handleStart}>
+				Start Recording
+			</button>
+		{:else if $recordingStatus === 'recording'}
+			<div class="recording-indicator">● Recording</div>
+			<div class="elapsed">{$recordingElapsed.toFixed(1)}s</div>
+			<button class="rec-btn stop" onclick={handleStop}>
+				Stop & Save
+			</button>
+		{:else if $recordingStatus === 'saving'}
+			<div class="recording-indicator saving">Saving episode…</div>
+		{/if}
+
+		{#if errorMsg}
+			<div class="error">{errorMsg}</div>
+		{/if}
 
 		<label>
-			<span>Batch Seed</span>
-			<input type="number" bind:value={$batchSeed} />
-		</label>
-
-		<label>
-			<span>Polling Interval (ms)</span>
-			<input type="number" min="0" bind:value={$pollingInterval} />
+			<span>Episode ID</span>
+			<input type="text" readonly value={$currentEpisodeId} />
 		</label>
 	</section>
 
@@ -118,5 +160,46 @@
 	input:focus {
 		outline: 2px solid #60a5fa;
 		outline-offset: 1px;
+	}
+
+	.rec-btn {
+		padding: 0.5rem 1rem;
+		border: none;
+		border-radius: 0;
+		font-size: 0.875rem;
+		font-weight: 600;
+		cursor: pointer;
+	}
+
+	.rec-btn.start {
+		background: #22c55e;
+		color: #052e16;
+	}
+
+	.rec-btn.stop {
+		background: #ef4444;
+		color: #450a0a;
+	}
+
+	.recording-indicator {
+		font-size: 0.875rem;
+		font-weight: 600;
+		color: #22c55e;
+	}
+
+	.recording-indicator.saving {
+		color: #fbbf24;
+	}
+
+	.elapsed {
+		font-size: 1.25rem;
+		font-weight: 700;
+		font-variant-numeric: tabular-nums;
+	}
+
+	.error {
+		font-size: 0.75rem;
+		color: #f87171;
+		word-break: break-word;
 	}
 </style>
